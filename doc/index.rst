@@ -9,8 +9,9 @@ Table of Contents
 
 .. toctree::
     :maxdepth: 1
-   
+
     api
+    zbibliography
 
 
 Indices and tables
