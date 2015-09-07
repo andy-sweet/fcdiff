@@ -36,7 +36,12 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
     'sphinxcontrib.bibtex',
+    'alabaster',
 ]
+
+# for numbered figures
+numfig = True
+
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -115,6 +120,38 @@ if not on_rtd:  # only import and set the theme if we're building docs locally
     import sphinx_rtd_theme
     html_theme = 'sphinx_rtd_theme'
     html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+
+#import sphinx_bootstrap_theme
+#html_theme = 'bootstrap'
+#html_theme_path = sphinx_bootstrap_theme.get_html_theme_path()
+#html_theme_options = {
+#    'navbar_site_name' : 'Site',
+#    'navbar_sidebarrel' : False,
+#    'navbar_pagenav' : True,
+#    'navbar_pagenav_name' : "Page",
+#    'globaltoc_depth' : 2,
+#    'bootswatch_theme' : 'sandstone',
+#}
+#
+#import alabaster
+#html_theme_path = [alabaster.get_path()]
+#html_theme = 'alabaster'
+#html_theme_options = {
+#    'description' : 'A Python module for Bayesian inference of differences in functional connectivity',
+#    'github_user' : 'andy-sweet',
+#    'github_repo' : 'fcdiff',
+#    'github_button' : True,
+#    'travis_button' : True,
+#}
+#html_sidebars = {
+#    '**': [
+#        'about.html',
+#        'navigation.html',
+#        'relations.html',
+#        'searchbox.html',
+#        'donate.html',
+#        ]
+#    }
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -205,7 +242,7 @@ latex_elements = {
 #'pointsize': '10pt',
 
 # Additional stuff for the LaTeX preamble.
-#'preamble': '',
+'preamble': '\usepackage{amssymb, amsmath, svg}',
 }
 
 # Grouping the document tree into LaTeX files. List of tuples
