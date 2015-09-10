@@ -18,7 +18,7 @@ import os
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-sys.path.insert(0, os.path.abspath('../src'))
+sys.path.insert(0, os.path.abspath('..'))
 
 # -- General configuration ------------------------------------------------
 
@@ -35,13 +35,17 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
+    'sphinx.ext.intersphinx',
     'sphinxcontrib.bibtex',
-    'alabaster',
 ]
 
 # for numbered figures
 numfig = True
 
+# for intersphinx
+intersphinx_mapping = {
+    'numpy' : ('http://docs.scipy.org/doc/numpy', None),
+}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

@@ -5,7 +5,8 @@ Methods
 
 This section describes our mathematical models of differences in functional
 connectivity and the methods we use to estimate anomalous connections and
-regions in unhealthy patients and groups.
+regions in unhealthy patients and groups. All these models are defined in
+:mod:`fcdiff.models`.
 
 
 Nomenclature
@@ -37,19 +38,22 @@ Individual Anomalous Regions
 
 First, we describe the individual anomalous region (IAR) model, in which
 the anomalous regions are not shared across the group of patients, though
-their parameters or effects are.
+their parameters or effects are. This model is defined in
+:class:`fcdiff.models.IARModel`.
 
 
 Generative Model
 ----------------
 
-If you're familiar with graphical models, then look at
-:numref:`graphical_model` for a summary of the generative model.
+.. currentmodule:: fcdiff.models
 
-.. _graphical_model:
+If you are familiar with graphical models, then look at
+:numref:`fig_graphical_model` for a summary of the generative model.
+
+.. _fig_graphical_model:
 
 .. figure:: images/graphical_model.*
-    :height: 400 pc
+    :width: 60 %
     :align: center
 
     The graph that represents the conditonal dependences between hidden random
@@ -57,20 +61,8 @@ If you're familiar with graphical models, then look at
     circles) and unknown fixed parameters (rounded rectangles) in our
     model. The sharp rectangles are plates that represent the number of
     times a variable or parameter is repeated.
-..     The non-trivial relationship between :math:`R` and :math:`T` is depicted
-..     in :numref:`graphical_model_rt`.
-.. 
-.. 
-.. .. _graphical_model_rt:
-.. 
-.. .. figure:: images/graphical_model_rt.*
-..     :height: 400 pc
-..     :align: center
-.. 
-..     The graph that represents the conditional dependences between the hidden
-..     random variables :math:`R` and :math:`T` for unhealthy patient :math:`u`.
 
-Now we'll go into detail on the distributions of these random variables and
+Now we go into more detail on the distributions of these random variables and
 their parameters.
 
 Let :math:`R_{nu}` be a Bernoulli random variable indicating that
@@ -81,6 +73,7 @@ from the distribution
     p(r_{nu}; \pi)  = \pi^{r_{nu}} (1 - \pi)^{1 - r_{nu}}
 
 where :math:`\pi \in (0, 1)` is the parameter of a Bernoulli distribution.
+You can sample from this distribution with :meth:`IARModel.sample_R`.
 
 Let :math:`T_{nmu}` be a Bernoulli random variable indicating that the
 connection between regions :math:`n` and :math:`m` of patient :math:`u` is
@@ -101,9 +94,11 @@ where :math:`\delta` is the Dirac delta function and :math:`\eta \in (0, 1)`
 is the parameter of a Bernoulli distribution. :math:`T_{nmu}` is
 deterministic if the anomalous state of regions :math:`n` and :math:`m` in
 patient :math:`u` is the same, and is a Bernoulli random variable with
-parameter :math:`\eta` if they are different. This distribution encourages
-anomalous networks containing cliques of anomalous nodes, where larger
-values of :math:`\eta` allow more edges outside of cliques to be affected.
+parameter :math:`\eta` if they are different.
+This distribution encourages anomalous networks containing cliques of
+anomalous nodes, where larger values of :math:`\eta` allow more edges
+outside of cliques to be affected.
+You can sample from this distribution with :meth:`IARModel.sample_T`.
 
 Let :math:`F_{nm}` be a multinomial random variable indicating the state of
 healthy connectivity between regions :math:`n` and :math:`m`.
@@ -126,6 +121,7 @@ where :math:`\gamma = (\gamma_{-1}, \gamma_0, \gamma_{1})` is the parameter
 vector of a Multinomial distribution such that
 :math:`\gamma_k \in (0, 1) \, \forall k` and
 :math:`\sum_{k = -1}^1 \gamma_k = 1`.
+You can sample from this distribution with :meth:`IARModel.sample_F`.
 
 Let :math:`\tilde{F}_{nmu}` be a multinomial random variable indicating the
 state of connectivity between regions :math:`n` and :math:`m` of
@@ -156,6 +152,7 @@ patient :math:`u` is anomalous, the connectivity state is perturbed from the
 healthy template with high probability :math:`1 - \epsilon`. Conversely, if
 the connection is typical, the connectivity state is perturbed with
 small probability :math:`\epsilon`.
+You can sample from this distribution with :meth:`IARModel.sample_F_tilde`.
 
 Let :math:`B_{nmh}` be the random Pearson correlation coefficient between the
 fMRI BOLD contrast time series from regions :math:`n` and :math:`m` of healthy
@@ -172,6 +169,7 @@ where :math:`\mu = (\mu_{-1}, \mu_0, \mu_{1})`,
 :math:`\sigma = (\sigma_{-1}, \sigma_0, \sigma_{1})` and
 :math:`\mathcal{N}(\cdot; \mu_k, \sigma_k^2)` is a Normal distribution
 with mean :math:`\mu_k` and variance :math:`\sigma_k^2`.
+You can sample from this distribution with :meth:`IARModel.sample_B`.
 
 Similarly, let :math:`\tilde{B}_{nmu}` denote the random Pearson correlation
 coefficient between the fMRI BOLD contrast time series from regions :math:`n`
@@ -186,6 +184,7 @@ the same mixture of Normal distributions as the healthy correlations
         \mathcal{N}(\tilde{b}_{nmh}; \mu_k, \sigma_k^2)^{\tilde{f}_{nmk}}
 
 except that it is conditional on :math:`\tilde{F}` instead of :math:`F`.
+You can sample from this distribution with :meth:`IARModel.sample_B_tilde`.
 
 We assume independence between all healthy subjects and patients,
 independence between healthy connections and independence between regions,
