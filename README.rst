@@ -18,7 +18,11 @@ Bayesian inference of differences in functional connectivity.
 
 Repository contents
 
-- src: Python source code
-- test: nose unit tests for the Python source code
 - doc: Sphinx documentation including an API
-
+- fcdiff: Python source code
+- test_fcdiff: unit tests for the Python source code
+- LICENSE: MIT License conditions
+- Makefile: GNU make file for building docs and running tests
+- README.rst: this file
+- requirements.txt: list of Python module requirments for Travis CI
+- .travis.yml: settings for Travis CI

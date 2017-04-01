@@ -6,7 +6,7 @@ Methods
 This section describes our mathematical models of differences in functional
 connectivity and the methods we use to estimate anomalous connections and
 regions in unhealthy patients and groups. All these models are defined in
-:mod:`fcdiff.models`.
+:mod:`fcdiff.model`.
 
 
 Nomenclature
@@ -39,21 +39,21 @@ Individual Anomalous Regions
 First, we describe the individual anomalous region (IAR) model, in which
 the anomalous regions are not shared across the group of patients, though
 their parameters or effects are. This model is defined in
-:class:`fcdiff.models.IARModel`.
+:class:`fcdiff.model.UnsharedRegionModel`.
 
 
 Generative Model
 ----------------
 
-.. currentmodule:: fcdiff.models
+.. currentmodule:: fcdiff.model
 
 If you are familiar with graphical models, then look at
 :numref:`fig_graphical_model` for a summary of the generative model.
 
 .. _fig_graphical_model:
 
-.. figure:: images/graphical_model.*
-    :width: 60 %
+.. figure:: images/graphical_model_all.*
+    :width: 100 %
     :align: center
 
     The graph that represents the conditonal dependences between hidden random
@@ -61,6 +61,8 @@ If you are familiar with graphical models, then look at
     circles) and unknown fixed parameters (rounded rectangles) in our
     model. The sharp rectangles are plates that represent the number of
     times a variable or parameter is repeated.
+    The right side of the figure shows the relationship between :math:`R`
+    and :math:`T`.
 
 Now we go into more detail on the distributions of these random variables and
 their parameters.
@@ -70,10 +72,11 @@ region :math:`n` of patient :math:`u` is anomalous. :math:`R_{nu}` is drawn
 from the distribution
 
 .. math::
-    p(r_{nu}; \pi)  = \pi^{r_{nu}} (1 - \pi)^{1 - r_{nu}}
+    p(r_{nu}; \pi)  = (1 - \pi)^{1 - r_{nu}} \pi^{r_{nu}}
 
 where :math:`\pi \in (0, 1)` is the parameter of a Bernoulli distribution.
-You can sample from this distribution with :meth:`IARModel.sample_R`.
+You can sample from this distribution with
+:meth:`UnsharedRegionModel.sample_R`.
 
 Let :math:`T_{nmu}` be a Bernoulli random variable indicating that the
 connection between regions :math:`n` and :math:`m` of patient :math:`u` is
@@ -87,7 +90,7 @@ at either end of the connection, and is drawn from the distribution
         \\
         \delta(1 - t_{nmu}) & \mathrm{if} \, r_{nu} = r_{mu} = 1
         \\
-        \eta^{t_{nmu}} (1 - \eta)^{1 - t_{nmu}} & \mathrm{if} \, r_{nu} \neq r_{mu} = 0
+        (1 - \eta)^{1 - t_{nmu}} \eta^{t_{nmu}} & \mathrm{if} \, r_{nu} \neq r_{mu}
     \end{cases}
 
 where :math:`\delta` is the Dirac delta function and :math:`\eta \in (0, 1)`
@@ -98,7 +101,8 @@ parameter :math:`\eta` if they are different.
 This distribution encourages anomalous networks containing cliques of
 anomalous nodes, where larger values of :math:`\eta` allow more edges
 outside of cliques to be affected.
-You can sample from this distribution with :meth:`IARModel.sample_T`.
+You can sample from this distribution with
+:meth:`UnsharedRegionModel.sample_T`.
 
 Let :math:`F_{nm}` be a multinomial random variable indicating the state of
 healthy connectivity between regions :math:`n` and :math:`m`.
@@ -115,13 +119,14 @@ is drawn from the distribution
     p(f_{nm}; \gamma)
     =
     \prod_{k = -1}^1
-        \gamma_k^{f_{nm}[k]}
+        \gamma_k^{f_{nmk}}
 
 where :math:`\gamma = (\gamma_{-1}, \gamma_0, \gamma_{1})` is the parameter
-vector of a Multinomial distribution such that
+vector of a multinomial distribution such that
 :math:`\gamma_k \in (0, 1) \, \forall k` and
 :math:`\sum_{k = -1}^1 \gamma_k = 1`.
-You can sample from this distribution with :meth:`IARModel.sample_F`.
+You can sample from this distribution with
+:meth:`UnsharedRegionModel.sample_F`.
 
 Let :math:`\tilde{F}_{nmu}` be a multinomial random variable indicating the
 state of connectivity between regions :math:`n` and :math:`m` of
@@ -152,24 +157,26 @@ patient :math:`u` is anomalous, the connectivity state is perturbed from the
 healthy template with high probability :math:`1 - \epsilon`. Conversely, if
 the connection is typical, the connectivity state is perturbed with
 small probability :math:`\epsilon`.
-You can sample from this distribution with :meth:`IARModel.sample_F_tilde`.
+You can sample from this distribution with
+:meth:`UnsharedRegionModel.sample_F_tilde`.
 
 Let :math:`B_{nmh}` be the random Pearson correlation coefficient between the
 fMRI BOLD contrast time series from regions :math:`n` and :math:`m` of healthy
-subject :math:`h`. :math:`B_{nmh}` is dependent on the healthy
+subject :math:`h`. This is dependent on the healthy
 connectivity state, and is drawn from a mixture of Normal distributions
 
 .. math::
     p(b_{nmh} | f_{nm}; \mu, \sigma)
     =
     \prod_{k = -1}^1
-        \mathcal{N}(b_{nmh}; \mu_k, \sigma_k^2)^{f_{nm}[k]}
+        \mathcal{N}(b_{nmh}; \mu_k, \sigma_k^2)^{f_{nmk}}
 
 where :math:`\mu = (\mu_{-1}, \mu_0, \mu_{1})`,
 :math:`\sigma = (\sigma_{-1}, \sigma_0, \sigma_{1})` and
 :math:`\mathcal{N}(\cdot; \mu_k, \sigma_k^2)` is a Normal distribution
 with mean :math:`\mu_k` and variance :math:`\sigma_k^2`.
-You can sample from this distribution with :meth:`IARModel.sample_B`.
+You can sample from this distribution with
+:meth:`UnsharedRegionModel.sample_B`.
 
 Similarly, let :math:`\tilde{B}_{nmu}` denote the random Pearson correlation
 coefficient between the fMRI BOLD contrast time series from regions :math:`n`
@@ -184,7 +191,8 @@ the same mixture of Normal distributions as the healthy correlations
         \mathcal{N}(\tilde{b}_{nmh}; \mu_k, \sigma_k^2)^{\tilde{f}_{nmk}}
 
 except that it is conditional on :math:`\tilde{F}` instead of :math:`F`.
-You can sample from this distribution with :meth:`IARModel.sample_B_tilde`.
+You can sample from this distribution with
+:meth:`UnsharedRegionModel.sample_B_tilde`.
 
 We assume independence between all healthy subjects and patients,
 independence between healthy connections and independence between regions,
@@ -285,56 +293,56 @@ Next, we marginalize out :math:`\tilde{F}_{nmu}`
     \\
     &\qquad
         \left(
-            (1 - \epsilon)^{f_{nm}[k]}
+            (1 - \epsilon)^{f_{nmk}}
             \left(
                 \frac{\epsilon}{2}
-            \right)^{1 - f_{nm}[k]}
+            \right)^{1 - f_{nmk}}
         \right)^{(1 - r_{nu}) (1 - r_{mu})}
     \\
     &\qquad
         \left(
-            \epsilon^{f_{nm}[k]}
+            \epsilon^{f_{nmk}}
             \left(
                 \frac{1 - \epsilon}{2}
-            \right)^{1 - f_{nm}[k]}
+            \right)^{1 - f_{nmk}}
         \right)^{r_{nu} r_{mu}}
     \\
     &\qquad
         \left(
-            \epsilon^{f_{nm}[k]}
+            \tilde{\epsilon}^{f_{nmk}}
             \left(
-                \frac{1 - \epsilon}{2}
-            \right)^{1 - f_{nm}[k]}
+                \frac{1 - \tilde{\epsilon}}{2}
+            \right)^{1 - f_{nmk}}
         \right)^{r_{nu} (1 - r_{mu}) + (1 - r_{nu}) r_{mu}}
     \\
     &=
     \prod_{k = -1}^{1}
         \bigg(
-            \mathcal{M}_{0k}(\tilde{b}_{nmu}; \theta)^{r_{nu} r_{mu}}
+            \mathcal{M}_{k0}(\tilde{b}_{nmu}; \theta)^{r_{nu} r_{mu}}
             \\
             &\qquad
-            \mathcal{M}_{1k}(\tilde{b}_{nmu}; \theta)^{(1 - r_{nu}) (1 - r_{mu})}
+            \mathcal{M}_{k1}(\tilde{b}_{nmu}; \theta)^{(1 - r_{nu}) (1 - r_{mu})}
             \\
             &\qquad
-            \mathcal{M}_{\neq k}(\tilde{b}_{nmu}; \theta)^{(r_{nu} (1 - r_{mu}) + (1 - r_{nu}) r_{mu})}
-        \bigg)^{f_{nm}[k]}
+            \mathcal{M}_{k \neq}(\tilde{b}_{nmu}; \theta)^{(r_{nu} (1 - r_{mu}) + (1 - r_{nu}) r_{mu})}
+        \bigg)^{f_{nmk}}
 
 where
 
 .. math::
-    \mathcal{M}_{0k}(\tilde{b}_{nmu}; \theta)
+    \mathcal{M}_{k0}(\tilde{b}_{nmu}; \theta)
     &=
     (1 - \epsilon) \mathcal{N}(\tilde{b}; \mu_k, \sigma_k^2)
     +
     \frac{\epsilon}{2} \sum_{l \neq k} \mathcal{N}(\tilde{b}_{nmu}; \mu_l, \sigma_l^2)
     \\
-    \mathcal{M}_{1k}(\tilde{b}_{nmu}; \theta)
+    \mathcal{M}_{k1}(\tilde{b}_{nmu}; \theta)
     &=
     \epsilon \mathcal{N}(\tilde{b}; \mu_k, \sigma_k^2)
     +
     \frac{1 - \epsilon}{2} \sum_{l \neq k} \mathcal{N}(\tilde{b}_{nmu}; \mu_l, \sigma_l^2)
     \\
-    \mathcal{M}_{\neq k}(\tilde{b}_{nmu}; \theta)
+    \mathcal{M}_{k \neq}(\tilde{b}_{nmu}; \theta)
     &=
     \tilde{\epsilon} \mathcal{N}(\tilde{b}; \mu_k, \sigma_k^2)
     +
@@ -345,14 +353,14 @@ where
     :math:`\epsilon` and :math:`\eta` with
     :math:`\mu` and :math:`\sigma`.
 
-As :math:`\epsilon` is assumed to be small :math:`\mathcal{M}_{0k}` is
+As :math:`\epsilon` is assumed to be small :math:`\mathcal{M}_{k0}` is
 dominated by the likelihood of the correlation being drawn from the
-:math:`k^\mathrm{th}` Normal distribution, whereas :math:`\mathcal{M}_{1k}`
+:math:`k^\mathrm{th}` Normal distribution, whereas :math:`\mathcal{M}_{k1}`
 is dominated by the likelihoods of the correlation being drawn from the
-other Normal distributions. Finally, :math:`\mathcal{M}_{\neq k}` is an
+other Normal distributions. Finally, :math:`\mathcal{M}_{k \neq}` is an
 interpolation between the other two terms that tends to
-:math:`\mathcal{M}_{0k}` as :math:`\eta \to 0` and tends to
-:math:`\mathcal{M}_{1k}` as :math:`\eta \to 1`.
+:math:`\mathcal{M}_{k0}` as :math:`\eta \to 0` and tends to
+:math:`\mathcal{M}_{k1}` as :math:`\eta \to 1`.
 
 Next, we could marginalize out :math:`F_{nm}`, but this would
 complicate the form enough to make inference difficult and would also couple
@@ -377,7 +385,7 @@ complicate the form enough to make inference difficult and would also couple
 ..             \gamma_k
 ..             \prod_{h=1}^H
 ..                 \mathcal{N}(b_{nmh}; \mu_k, \sigma_k^2)
-..             \mathcal{M}_{0k}(\tilde{b}_{nmu}; \theta)
+..             \mathcal{M}_{k0}(\tilde{b}_{nmu}; \theta)
 ..     \right)^{(1 - r_{nu}) (1 - r_{mu})}
 ..     \\
 ..     &\quad
@@ -386,7 +394,7 @@ complicate the form enough to make inference difficult and would also couple
 ..             \gamma_k
 ..             \prod_{h=1}^H
 ..                 \mathcal{N}(b_{nmh}; \mu_k, \sigma_k^2)
-..             \mathcal{M}_{1k}(\tilde{b}_{nmu}; \theta)
+..             \mathcal{M}_{k1}(\tilde{b}_{nmu}; \theta)
 ..     \right)^{r_{nu} r_{mu}}
 ..     \\
 ..     &\quad
@@ -395,7 +403,7 @@ complicate the form enough to make inference difficult and would also couple
 ..             \gamma_k
 ..             \prod_{h=1}^H
 ..                 \mathcal{N}(b_{nmh}; \mu_k, \sigma_k^2)
-..             \mathcal{M}_{\neq k}(\tilde{b}_{nmu}; \theta)
+..             \mathcal{M}_{k \neq}(\tilde{b}_{nmu}; \theta)
 ..     \right)^{r_{nu} (1 - r_{mu}) + (1 - r_{nu}) r_{mu}}
 
 
@@ -455,13 +463,12 @@ The factorization takes the form
         \prod_{n = 1}^{N}
         \prod_{m > n}
         \prod_{k = -1}^{1}
-            q_{F_{nm}}[k]^{f_{nm}[k]}
+            q_{F_{nmk}}^{f_{nmk}}
     \right)
     \left(
         \prod_{n = 1}^N
         \prod_{u = 1}^U
-        \prod_{l = 0}^{1}
-            q_{R_{nu}}[l]^{r_{nu}[l]}
+            q_{R_{nu0}}^{1 - r_{nu}} q_{R_{nu1}}^{r_{nu}}
     \right).
 
 Computing the posterior :math:`p(r | b, \tilde{b}; \theta)` also requires
@@ -486,50 +493,107 @@ variational free energy
         \log p(\tilde{b} | f, r; \epsilon, \eta, \mu, \sigma)
     \right]
     + \mathbb{E}_{q_R} \left[ \log q_R(r) \right]
-    + \mathbb{E}_{q_F} \left[ \log q_F(f) \right].
+    + \mathbb{E}_{q_F} \left[ \log q_F(f) \right]
+
+where
+
+.. math::
+    \mathbb{E}_{q_F} \left[ \log p(f; \gamma) \right]
+    &=
+    \sum_{n = 1}^N
+    \sum_{m > n}
+    \sum_{k = -1}^{1}
+        q_{F_{nmk}} \log \gamma_k
+    \\
+    \mathbb{E}_{q_R} \left[ \log p(r; \pi) \right]
+    &=
+    \sum_{n = 1}^N
+    \sum_{u = 1}^U
+        q_{R_{nu0}} \log (1 - \pi)
+        +
+        q_{R_{nu1}} \log \pi
+    \\
+    \mathbb{E}_{q_F} \left[ \log p(b | f; \mu, \sigma) \right]
+    &=
+    \sum_{n = 1}^N
+    \sum_{m > n}
+    \sum_{k = -1}^{1}
+        q_{F_{nmk}}
+        \sum_{h = 1}^H
+            \log \mathcal{N}(b_{nmh}; \mu_k, \sigma_k^2)
+    \\
+    \mathbb{E}_{q_F q_R} \left[
+        \log p(\tilde{b} | f, r; \epsilon, \eta, \mu, \sigma)
+    \right]
+    &=
+    \sum_{n = 1}^N
+    \sum_{m > n}
+    \sum_{k = -1}^{1}
+        q_{F_{nmk}}
+        \sum_{u = 1}^U
+        \bigg(
+            q_{R_{nu0}} q_{R_{mu0}}
+                \log \mathcal{M}_{k0}(\tilde{b}_{nmu}; \theta)
+    \\
+    &\qquad
+            +
+            q_{R_{nu1}} q_{R_{mu1}}
+                \log \mathcal{M}_{k1}(\tilde{b}_{nmu}; \theta)
+    \\
+    &\qquad
+            +
+            \left( q_{R_{nu0}} q_{R_{mu1}} + q_{R_{nu1}} q_{R_{mu0}} \right)
+                \log \mathcal{M}_{k \neq}(\tilde{b}_{nmu}; \theta)
+        \bigg)
+    \\
+    \mathbb{E}_{q_F} \left[ \log q(f) \right]
+    &=
+    \sum_{n = 1}^N
+    \sum_{m > n}
+    \sum_{k = -1}^{1}
+        q_{F_{nmk}} \log q_{F_{nmk}}
+    \\
+    \mathbb{E}_{q_R} \left[ \log q(r) \right]
+    &=
+    \sum_{n = 1}^N
+    \sum_{u = 1}^U
+        q_{R_{nu0}} \log q_{R_{nu0}}
+        +
+        q_{R_{nu1}} \log q_{R_{nu1}}.
 
 The algorithm for performing this minimization is
 
 .. math::
 
     \begin{array}{lll}
-        \text{Line} & \text{Operation} & \text{Time Complexity}
+        \text{Line} & \text{Operation}
         \\ \hline
         1 &
         e \gets \mathcal{E}(q, \theta, b, \tilde{b})
-        & \mathcal{O}(N^2(H + U))
         \\
         2 &
         \text{for } s = 1 \dots S
-        & \mathcal{O}(SN^2(H + U))
         \\
         3 & \quad
             q_F^* \gets \mathcal{U}_{q_F}(q_R, \theta, b, \tilde{b})
-            & \mathcal{O}(N^2(H + U))
         \\
         4 & \quad
             q_R^* \gets \mathcal{U}_{q_R}(q_R,q_F^*, \theta, b, \tilde{b})
-            & \mathcal{O}(N^2(H + U))
         \\
         5 & \quad
             \theta^* \gets \mathcal{U}_{\theta}(q^*, \theta, b, \tilde{b})
-            & \mathcal{O}(N^2(H + U))
         \\
         6 & \quad
             e^* \gets \mathcal{E}(q^*, \theta^*, b, \tilde{b})
-            & \mathcal{O}(N^2(H + U))
         \\
         7 & \quad
-            \text{if } (e - e^*) / e > \xi
-            & \mathcal{O}(1)
+            \text{if } (e - e^*) / e < \xi
         \\
         8 & \quad \quad
                 \text{break}
-                & \mathcal{O}(1)
         \\
         9 & \quad
             q \gets q^*, \, \theta \gets \theta^*, \, e \gets e^*
-            & \mathcal{O}(1)
     \end{array}
 
 where :math:`\xi` is the relative tolerance used to detect convergence before
@@ -539,7 +603,7 @@ The :math:`\mathcal{U}_{q_F}` function is determined by the following update
 equation
 
 .. math::
-    \log q_{F_{nm}}^*[k]
+    \log q_{F_{nmk}}^*
     &=
     \log \gamma_k
     +
@@ -549,25 +613,31 @@ equation
     &\quad
     +
     \sum_{u=1}^U
-        q_{R_{nu}}[0] q_{R_{mu}}[0] \log \mathcal{M}_{0k}(\tilde{b}_{nmu}; \theta)
+        q_{R_{nu0}} q_{R_{mu0}} \log \mathcal{M}_{k0}(\tilde{b}_{nmu}; \theta)
         +
-        q_{R_{nu}}[1] q_{R_{mu}}[1] \log \mathcal{M}_{1k}(\tilde{b}_{nmu}; \theta)
+        q_{R_{nu1}} q_{R_{mu1}} \log \mathcal{M}_{k1}(\tilde{b}_{nmu}; \theta)
     \\
     &\qquad
         +
         \left(
-            q_{R_{nu}}[1] q_{R_{mu}}[0]
+            q_{R_{nu1}} q_{R_{mu0}}
             +
-            q_{R_{nu}}[0] q_{R_{mu}}[1]
+            q_{R_{nu0}} q_{R_{mu1}}
         \right)
-        \log \mathcal{M}_{\neq k}(\tilde{b}_{nmu}; \theta)
-    + \text{const.}.
+        \log \mathcal{M}_{k \neq}(\tilde{b}_{nmu}; \theta)
+    + \text{const.}
+
+where :math:`\text{const.}` is used to imply that :math:`\log q_{F_{nmk}}^*`
+is further normalized to ensure that :math:`\sum_{k=-1}^1 q_{F_{nmk}}^* = 1`.
+
+.. note::
+    We optimize w.r.t. :math:`\log q` to ensure positivity of :math:`q`.
 
 The :math:`\mathcal{U}_{q_R}` function is determined by the following update
 equations
 
 .. math::
-    \log_{R_{nu}}^*[0]
+    \log q_{R_{nu0}}^*
     &=
     \log(1 - \pi)
     \\
@@ -575,17 +645,17 @@ equations
     +
     \sum_{m \neq n}
     \sum_{k=-1}^{1}
-        q_{F_{nm}}[k]
+        q_{F_{nmk}}
         \left(
-            q_{R_{mu}}[0] \log \mathcal{M}_{0k}(\tilde{b}_{nmu}; \theta)
+            q_{R_{mu0}} \log \mathcal{M}_{k0}(\tilde{b}_{nmu}; \theta)
             +
-            q_{R_{mu}}[1] \log \mathcal{M}_{\neq k}(\tilde{b}_{nmu}; \theta)
+            q_{R_{mu1}} \log \mathcal{M}_{k \neq}(\tilde{b}_{nmu}; \theta)
         \right)
     +
     \text{const.}
 
 .. math::
-    \log_{R_{nu}}^*[1]
+    \log q_{R_{nu1}}^*
     &=
     \log \pi
     \\
@@ -593,14 +663,27 @@ equations
     +
     \sum_{m \neq n}
     \sum_{k=-1}^{1}
-        q_{F_{nm}}[k]
+        q_{F_{nmk}}
         \left(
-            q_{R_{mu}}[1] \log \mathcal{M}_{1k}(\tilde{b}_{nmu}; \theta)
+            q_{R_{mu1}} \log \mathcal{M}_{k1}(\tilde{b}_{nmu}; \theta)
             +
-            q_{R_{mu}}[0] \log \mathcal{M}_{\neq k}(\tilde{b}_{nmu}; \theta)
+            q_{R_{mu0}} \log \mathcal{M}_{k \neq}(\tilde{b}_{nmu}; \theta)
         \right)
     +
     \text{const.}
+
+where :math:`\text{const.}` is used to imply that :math:`\log q_{R_{nu0}}^*`
+and :math:`\log q_{R_{nu1}}^*` are further normalized to ensure that
+:math:`q_{R_{nu0}}^* + q_{R_{nu1}}^* = 1`.
+
+.. note::
+    Here, we estimate each component of the variational parameters and then
+    project the solution onto the solution space of probability
+    distributions.
+    Instead, we could incorporate the equality constraints into the linear
+    system of equations. However, note that means we would have to optimize
+    w.r.t. :math:`q` instead of :math:`\log q` and thus would need to
+    explicitly handle the positivity constraints.
 
 The :math:`\mathcal{U}_{\theta}` function is determined by the following
 update equations
@@ -611,14 +694,14 @@ update equations
     \frac{1}{UN}
     \sum_{u=1}^U
     \sum_{n=1}^N
-        q_{R_{nu}}[1]
+        q_{R_{nu1}}
 
 .. math::
     \gamma_k^*
     =
     \sum_{n=1}^N
     \sum_{m > n}
-        q_{F_{nm}}[k]
+        q_{F_{nmk}}
     +
     \text{const.}
 
@@ -627,12 +710,14 @@ respect to :math:`(\mu, \sigma, \epsilon, \eta)`.
 This minimization can be performed using a variety of iterative descent
 methods.
 By default, a trust region reflective Gauss-Newton method is used.
+In order to use a descent method, we need the following derivatives.
 
-In order to use a descent method, the following derivatives are required
+The derivative of the energy w.r.t. :math:`\mu_j` is
 
 .. math::
     \frac{\partial \mathcal{E}}{\partial \mu_j}
     &=
+    -
     \frac{\partial}{\partial \mu_j} \left(
         \mathbb{E}_{q_F} \left[
             \log p(b | f; \mu, \sigma)
@@ -644,9 +729,10 @@ In order to use a descent method, the following derivatives are required
     \right)
     \\
     &=
+    -
     \sum_{n=1}^N
     \sum_{m > n} \bigg(
-        q_{F_{nm}}[j]
+        q_{F_{nmj}}
         \sum_{h=1}^H
             \frac{\partial}{\partial \mu_j} \left(
                 \log \mathcal{N}(b_{nmh}; \mu_j, \sigma_j^2)
@@ -655,36 +741,99 @@ In order to use a descent method, the following derivatives are required
     &\quad
         +
         \sum_{k=-1}^1
-        q_{F_{nm}}[k] \bigg(
+        q_{F_{nmk}} \bigg(
             \sum_{u=1}^U
-                q_{R_{nu}}[0] q_{R_{mu}}[0]
+                q_{R_{nu0}} q_{R_{mu0}}
                 \frac{\partial}{\partial \mu_j} \left(
-                    \log \mathcal{M}_{0k}(\tilde{b}_{nmu}; \theta)
+                    \log \mathcal{M}_{k0}(\tilde{b}_{nmu}; \theta)
                 \right)
     \\
     &\qquad
                 +
-                q_{R_{nu}}[1] q_{R_{mu}}[1]
+                q_{R_{nu1}} q_{R_{mu1}}
                 \frac{\partial}{\partial \mu_j} \left(
-                    \log \mathcal{M}_{1k}(\tilde{b}_{nmu}; \theta)
+                    \log \mathcal{M}_{k1}(\tilde{b}_{nmu}; \theta)
                 \right)
     \\
     &\qquad
                 +
                 \left(
-                    q_{R_{nu}}[0] q_{R_{mu}}[1]
+                    q_{R_{nu0}} q_{R_{mu1}}
                     +
-                    q_{R_{nu}}[1] q_{R_{mu}}[0]
+                    q_{R_{nu1}} q_{R_{mu0}}
                 \right)
                 \frac{\partial}{\partial \mu_j} \left(
-                    \log \mathcal{M}_{\neq k}(\tilde{b}_{nmu}; \theta)
+                    \log \mathcal{M}_{k \neq}(\tilde{b}_{nmu}; \theta)
                 \right)
         \bigg)
     \bigg)
 
+where
+
+.. math::
+    \frac{\partial}{\partial \mu_j}
+    \left(
+        \log \mathcal{M}_{k0}(b; \theta)
+    \right)
+    =
+    \mathcal{M}_{k0}(b; \theta)^{-1}
+    (1 - \epsilon)^{\delta(j, k)}
+    \left( \frac{\epsilon}{2} \right)^{1 - \delta(j, k)}
+    \frac{\partial}{\partial \mu_j}
+    \left(
+        \mathcal{N}(b; \mu_j, \sigma_j^2)
+    \right)
+
+.. math::
+    \frac{\partial}{\partial \mu_j} \left(
+        \log \mathcal{M}_{k1}(b; \theta)
+    \right)
+    =
+    \mathcal{M}_{k1}(b; \theta)^{-1}
+    \epsilon^{\delta(j, k)}
+    \left( \frac{1 - \epsilon}{2} \right)^{1 - \delta(j, k)}
+    \frac{\partial}{\partial \mu_j} \left(
+        \mathcal{N}(b; \mu_j, \sigma_j^2)
+    \right)
+
+.. math::
+    \frac{\partial}{\partial \mu_j} \left(
+        \log \mathcal{M}_{k \neq}(b; \theta)
+    \right)
+    =
+    \mathcal{M}_{k \neq}(b; \theta)^{-1}
+    \tilde{\epsilon}^{\delta(j, k)}
+    \left( \frac{1 - \tilde{\epsilon}}{2} \right)^{1 - \delta(j, k)}
+    \frac{\partial}{\partial \mu_j} \left(
+        \mathcal{N}(b; \mu_j, \sigma_j^2)
+    \right)
+
+and
+
+.. math::
+    \frac{\partial}{\partial \mu_j} \left(
+        \mathcal{N}(b; \mu_j, \sigma_j^2)
+    \right)
+    =
+    \mathcal{N}(b; \mu_j, \sigma_j^2)
+    \frac{\partial}{\partial \mu_j} \left(
+        \log \mathcal{N}(b; \mu_j, \sigma_j^2)
+    \right)
+
+.. math::
+    \frac{\partial}{\partial \mu_j} \left(
+        \log \mathcal{N}(b; \mu_j, \sigma_j^2)
+    \right)
+    =
+    \sigma_j^{-2}
+    (b - \mu_j)
+
+The derivative of the energy w.r.t. :math:`\sigma_j^2` is
+
 .. math::
     \frac{\partial \mathcal{E}}{\partial \sigma_j^2}
     &=
+    -
     \frac{\partial}{\partial \sigma_j^2} \left(
         \mathbb{E}_{q_F} \left[
             \log p(b | f; \mu, \sigma)
@@ -696,9 +845,10 @@ In order to use a descent method, the following derivatives are required
     \right)
     \\
     &=
+    -
     \sum_{n=1}^N
     \sum_{m > n} \bigg(
-        q_{F_{nm}}[j]
+        q_{F_{nmj}}
         \sum_{h=1}^H
             \frac{\partial}{\partial \sigma_j^2} \left(
                 \log \mathcal{N}(b_{nmh}; \mu_j^2, \sigma_j^2)
@@ -707,75 +857,98 @@ In order to use a descent method, the following derivatives are required
     &\quad
         +
         \sum_{k=-1}^1
-        q_{F_{nm}}[k] \bigg(
+        q_{F_{nmk}} \bigg(
             \sum_{u=1}^U
-                q_{R_{nu}}[0] q_{R_{mu}}[0]
+                q_{R_{nu0}} q_{R_{mu0}}
                 \frac{\partial}{\partial \sigma_j^2} \left(
-                    \log \mathcal{M}_{0k}(\tilde{b}_{nmu}; \theta)
+                    \log \mathcal{M}_{k0}(\tilde{b}_{nmu}; \theta)
                 \right)
     \\
     &\qquad
                 +
-                q_{R_{nu}}[1] q_{R_{mu}}[1]
+                q_{R_{nu1}} q_{R_{mu1}}
                 \frac{\partial}{\partial \sigma_j^2} \left(
-                    \log \mathcal{M}_{1k}(\tilde{b}_{nmu}; \theta)
+                    \log \mathcal{M}_{k1}(\tilde{b}_{nmu}; \theta)
                 \right)
     \\
     &\qquad
                 +
                 \left(
-                    q_{R_{nu}}[0] q_{R_{mu}}[1]
+                    q_{R_{nu0}} q_{R_{mu1}}
                     +
-                    q_{R_{nu}}[1] q_{R_{mu}}[0]
+                    q_{R_{nu1}} q_{R_{mu0}}
                 \right)
                 \frac{\partial}{\partial \sigma_j^2} \left(
-                    \log \mathcal{M}_{\neq k}(\tilde{b}_{nmu}; \theta)
+                    \log \mathcal{M}_{k \neq}(\tilde{b}_{nmu}; \theta)
                 \right)
         \bigg)
     \bigg)
 
+where
+
 .. math::
-    \frac{\partial \mathcal{E}}{\partial \epsilon}
-    &=
-    \frac{\partial}{\partial \epsilon} \left(
-        \mathbb{E}_{q_F q_R} \left[
-            \log p(\tilde{b} | f, r; \theta)
-        \right]
+    \frac{\partial}{\partial \sigma_j^2} \left(
+        \log \mathcal{M}_{k0}(b; \theta)
     \right)
-    \\
-    &=
-    \sum_{n=1}^N
-    \sum_{m > n}
-    \sum_{k = -1}^1
-        q_{F_{nm}}[k] \bigg(
-        \sum_{u=1}^U
-            q_{R_{nu}}[0] q_{R_{mu}}[0]
-            \frac{\partial}{\partial \epsilon} \left(
-                \log \mathcal{M}_{0k}(\tilde{b}_{nmu}; \theta)
-            \right)
-    \\
-    &\qquad
-            +
-            q_{R_{nu}}[1] q_{R_{mu}}[1]
-            \frac{\partial}{\partial \epsilon} \left(
-                \log \mathcal{M}_{1k}(\tilde{b}_{nmu}; \theta)
-            \right)
-    \\
-    &\qquad
-            +
-            \left(
-                q_{R_{nu}}[0] q_{R_{mu}}[1]
-                +
-                q_{R_{nu}}[1] q_{R_{mu}}[0]
-            \right)
-            \frac{\partial}{\partial \epsilon} \left(
-                \log \mathcal{M}_{\neq k}(\tilde{b}_{nmu}; \theta)
-            \right)
-        \bigg)
+    =
+    \mathcal{M}_{k0}(b; \theta)^{-1}
+    (1 - \epsilon)^{\delta(j, k)}
+    \left( \frac{\epsilon}{2} \right)^{1 - \delta(j, k)}
+    \frac{\partial}{\partial \sigma_j^2} \left(
+        \mathcal{N}(b; \mu_j, \sigma_j^2)
+    \right)
+
+.. math::
+    \frac{\partial}{\partial \sigma_j^2} \left(
+        \log \mathcal{M}_{k1}(b; \theta)
+    \right)
+    =
+    \mathcal{M}_{k1}(b; \theta)^{-1}
+    \epsilon^{\delta(j, k)}
+    \left( \frac{1 - \epsilon}{2} \right)^{1 - \delta(j, k)}
+    \frac{\partial}{\partial \sigma_j^2} \left(
+        \mathcal{N}(b; \mu_j, \sigma_j^2)
+    \right)
+
+.. math::
+    \frac{\partial}{\partial \sigma_j^2} \left(
+        \log \mathcal{M}_{k \neq}(b; \theta)
+    \right)
+    =
+    \mathcal{M}_{k \neq}(b; \theta)^{-1}
+    \tilde{\epsilon}^{\delta(j, k)}
+    \left( \frac{1 - \tilde{\epsilon}}{2} \right)^{1 - \delta(j, k)}
+    \frac{\partial}{\partial \sigma_j^2} \left(
+        \mathcal{N}(b; \mu_j, \sigma_j^2)
+    \right)
+
+and
+
+.. math::
+    \frac{\partial}{\partial \sigma_j^2} \left(
+        \log \mathcal{N}(b; \mu_j, \sigma_j^2)
+    \right)
+    =
+    (2 \sigma_j^2)^{-1} \left(
+        (b - \mu_j)^2 - \sigma_j^2
+    \right)
+
+.. math::
+    \frac{\partial}{\partial \sigma_j^2} \left(
+        \mathcal{N}(b; \mu_j, \sigma_j^2)
+    \right)
+    =
+    \mathcal{N}(b; \mu_j, \sigma_j^2)
+    \frac{\partial}{\partial \sigma_j^2} \left(
+        \log \mathcal{N}(b; \mu_j, \sigma_j^2)
+    \right)
+
+The derivative of the energy w.r.t. :math:`\eta` is
 
 .. math::
     \frac{\partial \mathcal{E}}{\partial \eta}
     &=
+    -
     \frac{\partial}{\partial \eta} \left(
         \mathbb{E}_{q_F q_R} \left[
             \log p(\tilde{b} | f, r; \theta)
@@ -783,128 +956,120 @@ In order to use a descent method, the following derivatives are required
     \right)
     \\
     &=
+    -
     \sum_{n=1}^N
     \sum_{m > n}
     \sum_{k = -1}^1
-        q_{F_{nm}}[k]
+        q_{F_{nmk}}
         \sum_{u=1}^U
             \left(
-                q_{R_{nu}}[0] q_{R_{mu}}[1]
+                q_{R_{nu0}} q_{R_{mu1}}
                 +
-                q_{R_{nu}}[1] q_{R_{mu}}[0]
+                q_{R_{nu1}} q_{R_{mu0}}
             \right)
             \frac{\partial}{\partial \eta} \left(
-                \log \mathcal{M}_{\neq k}(\tilde{b}_{nmu}; \theta)
+                \log \mathcal{M}_{k \neq}(\tilde{b}_{nmu}; \theta)
             \right)
 
 where
 
 .. math::
-    \frac{\partial}{\partial \mu_j} \left(
-        \log \mathcal{M}_{0k}(b; \theta)
+    \frac{\partial}{\partial \eta} \left(
+        \log \mathcal{M}_{k \neq}(\tilde{b}; \theta)
     \right)
+    =
+    \mathcal{M}_{k \neq}(\tilde{b}; \theta)^{-1}
+    \left(
+        (2 \epsilon - 1) \mathcal{N}(\tilde{b}; \mu_k, \sigma_k^2)
+        -
+        \frac{(2 \epsilon - 1)}{2}
+        \sum_{l \neq k}
+            \mathcal{N}(\tilde{b}; \mu_l, \sigma_l)
+    \right)
+
+The derivative of the energy w.r.t. :math:`\epsilon` is
+
+.. math::
+    \frac{\partial \mathcal{E}}{\partial \epsilon}
     &=
-    \mathcal{M}_{0k}(b; \theta)^{-1}
-    (1 - \epsilon)^{\delta(j, k)}
-    \left( \frac{\epsilon}{2} \right)^{1 - \delta(j, k)}
-    \frac{\partial}{\partial \mu_j} \left(
-        \mathcal{N}(b; \mu_j, \sigma_j^2)
+    -
+    \frac{\partial}{\partial \epsilon} \left(
+        \mathbb{E}_{q_F q_R} \left[
+            \log p(\tilde{b} | f, r; \theta)
+        \right]
+    \right)
+    \\
+    &=
+    -
+    \sum_{n=1}^N
+    \sum_{m > n}
+    \sum_{k = -1}^1
+        q_{F_{nmk}} \bigg(
+        \sum_{u=1}^U
+            q_{R_{nu0}} q_{R_{mu0}}
+            \frac{\partial}{\partial \epsilon} \left(
+                \log \mathcal{M}_{k0}(\tilde{b}_{nmu}; \theta)
+            \right)
+    \\
+    &\qquad
+            +
+            q_{R_{nu1}} q_{R_{mu1}}
+            \frac{\partial}{\partial \epsilon} \left(
+                \log \mathcal{M}_{k1}(\tilde{b}_{nmu}; \theta)
+            \right)
+    \\
+    &\qquad
+            +
+            \left(
+                q_{R_{nu0}} q_{R_{mu1}}
+                +
+                q_{R_{nu1}} q_{R_{mu0}}
+            \right)
+            \frac{\partial}{\partial \epsilon} \left(
+                \log \mathcal{M}_{k \neq}(\tilde{b}_{nmu}; \theta)
+            \right)
+        \bigg)
+
+where
+
+.. math::
+    \frac{\partial}{\partial \epsilon} \left(
+        \log \mathcal{M}_{k0}(\tilde{b}; \theta)
+    \right)
+    =
+    \mathcal{M}_{k0}(\tilde{b}; \theta)^{-1}
+    \left(
+        \frac{1}{2}
+        \sum_{l \neq k}
+            \mathcal{N}(\tilde{b}; \mu_l, \sigma_l^2)
+        -
+        \mathcal{N}(\tilde{b}; \mu_k, \sigma_k^2)
     \right)
 
 .. math::
-    \frac{\partial}{\partial \mu_j} \left(
-        \log \mathcal{M}_{1k}(b; \theta)
+    \frac{\partial}{\partial \epsilon} \left(
+        \log \mathcal{M}_{k1}(\tilde{b}; \theta)
     \right)
-    &=
-    \mathcal{M}_{1k}(b; \theta)^{-1}
-    \epsilon^{\delta(j, k)}
-    \left( \frac{1 - \epsilon}{2} \right)^{1 - \delta(j, k)}
-    \frac{\partial}{\partial \mu_j} \left(
-        \mathcal{N}(b; \mu_j, \sigma_j^2)
-    \right)
-
-.. math::
-    \frac{\partial}{\partial \mu_j} \left(
-        \log \mathcal{M}_{\neq k}(b; \theta)
-    \right)
-    &=
-    \mathcal{M}_{\neq k}(b; \theta)^{-1}
-    \tilde{\epsilon}^{\delta(j, k)}
-    \left( \frac{1 - \tilde{\epsilon}}{2} \right)^{1 - \delta(j, k)}
-    \frac{\partial}{\partial \mu_j} \left(
-        \mathcal{N}(b; \mu_j, \sigma_j^2)
+    =
+    \mathcal{M}_{k1}(\tilde{b}; \theta)^{-1}
+    \left(
+        \mathcal{N}(\tilde{b}; \mu_k, \sigma_k^2)
+        -
+        \frac{1}{2}
+        \sum_{l \neq k}
+            \mathcal{N}(\tilde{b}; \mu_l, \sigma_l^2)
     \right)
 
 .. math::
-    \frac{\partial}{\partial \sigma_j^2} \left(
-        \log \mathcal{M}_{0k}(b; \theta)
+    \frac{\partial}{\partial \epsilon} \left(
+        \log \mathcal{M}_{k \neq}(\tilde{b}; \theta)
     \right)
-    &=
-    \mathcal{M}_{0k}(b; \theta)^{-1}
-    (1 - \epsilon)^{\delta(j, k)}
-    \left( \frac{\epsilon}{2} \right)^{1 - \delta(j, k)}
-    \frac{\partial}{\partial \sigma_j^2} \left(
-        \mathcal{N}(b; \mu_j, \sigma_j^2)
+    =
+    \mathcal{M}_{k \neq}(\tilde{b}; \theta)^{-1}
+    \left(
+        (2 \eta - 1) \mathcal{N}(\tilde{b}; \mu_k, \sigma_k^2)
+        -
+        \frac{(2 \eta - 1)}{2}
+        \sum_{l \neq k}
+            \mathcal{N}(\tilde{b}; \mu_l, \sigma_l^2)
     \right)
-
-.. math::
-    \frac{\partial}{\partial \sigma_j^2} \left(
-        \log \mathcal{M}_{1k}(b; \theta)
-    \right)
-    &=
-    \mathcal{M}_{1k}(b; \theta)^{-1}
-    \epsilon^{\delta(j, k)}
-    \left( \frac{1 - \epsilon}{2} \right)^{1 - \delta(j, k)}
-    \frac{\partial}{\partial \sigma_j^2} \left(
-        \mathcal{N}(b; \mu_j, \sigma_j^2)
-    \right)
-
-.. math::
-    \frac{\partial}{\partial \sigma_j^2} \left(
-        \log \mathcal{M}_{\neq k}(b; \theta)
-    \right)
-    &=
-    \mathcal{M}_{\neq k}(b; \theta)^{-1}
-    \tilde{\epsilon}^{\delta(j, k)}
-    \left( \frac{1 - \tilde{\epsilon}}{2} \right)^{1 - \delta(j, k)}
-    \frac{\partial}{\partial \sigma_j^2} \left(
-        \mathcal{N}(b; \mu_j, \sigma_j^2)
-    \right)
-
-.. math::
-    \frac{\partial}{\partial \mu_j} \left(
-        \log \mathcal{N}(b; \mu_j, \sigma_j^2)
-    \right)
-    &=
-    \sigma_j^{-2}
-    (b - \mu_j)
-
-.. math::
-    \frac{\partial}{\partial \sigma_j^2} \left(
-        \log \mathcal{N}(b; \mu_j, \sigma_j^2)
-    \right)
-    &=
-    (2 \sigma_j^2)^{-1} \left(
-        (b - \mu_j)^2 - \sigma_j^2
-    \right)
-
-.. math::
-    \frac{\partial}{\partial \mu_j} \left(
-        \mathcal{N}(b; \mu_j, \sigma_j^2)
-    \right)
-    &=
-    \mathcal{N}(b; \mu_j, \sigma_j^2)
-    \frac{\partial}{\partial \mu_j} \left(
-        \log \mathcal{N}(b; \mu_j, \sigma_j^2)
-    \right)
-
-.. math::
-    \frac{\partial}{\partial \sigma_j^2} \left(
-        \mathcal{N}(b; \mu_j, \sigma_j^2)
-    \right)
-    &=
-    \mathcal{N}(b; \mu_j, \sigma_j^2)
-    \frac{\partial}{\partial \sigma_j^2} \left(
-        \log \mathcal{N}(b; \mu_j, \sigma_j^2)
-    \right)
-

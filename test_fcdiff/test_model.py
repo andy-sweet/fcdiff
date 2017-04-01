@@ -1,25 +1,21 @@
 import sys, os, unittest
-import nose.tools
 import numpy as np
 import numpy.testing as nptest
+import fcdiff
 
-this_dir = os.path.dirname(os.path.realpath(__file__))
-sys.path.append(os.path.join(this_dir, '..'))
-import fcdiff.models
-
-class IARModelTestCase(unittest.TestCase):
+class UnsharedRegionModelTest(unittest.TestCase):
 
     def test_str(self):
         """ Tests informal string representation.
         """
-        model = fcdiff.models.IARModel()
+        model = fcdiff.UnsharedRegionModel()
         model_str = model.__str__()
-        nose.tools.assert_is(type(model_str), str)
+        assert(type(model_str) == str)
 
     def test_sample(self):
         """ Tests sampling all random variables.
         """
-        model = fcdiff.models.IARModel()
+        model = fcdiff.UnsharedRegionModel()
         N = 10
         H = 5
         U = 4
@@ -41,7 +37,7 @@ class IARModelTestCase(unittest.TestCase):
     def test_sample_R(self):
         """ Tests sampling R and checks estimated pi.
         """
-        model = fcdiff.models.IARModel()
+        model = fcdiff.UnsharedRegionModel()
         r = model.sample_R(3, 10000)
         pi_est = np.mean(r, axis = 1)
         nptest.assert_allclose(pi_est, model.pi, atol = 0.02)
@@ -49,7 +45,7 @@ class IARModelTestCase(unittest.TestCase):
     def test_sample_T_partially_connected(self):
         """ Tests sampling T and given R that implies partial connectivity.
         """
-        model = fcdiff.models.IARModel()
+        model = fcdiff.UnsharedRegionModel()
         r = np.tile(np.array([[1], [0], [0]], dtype='bool'), (1, 10000))
         t = model.sample_T(r)
         nptest.assert_equal(t[2, :], 0)
@@ -59,7 +55,7 @@ class IARModelTestCase(unittest.TestCase):
     def test_sample_T_fully_connected(self):
         """ Tests sampling T given R that implies full connectivity.
         """
-        model = fcdiff.models.IARModel()
+        model = fcdiff.UnsharedRegionModel()
         r = np.ones((3, 1), dtype = 'bool')
         t = model.sample_T(r)
         t_exp = np.ones((3, 1), dtype = 'bool')
@@ -68,7 +64,7 @@ class IARModelTestCase(unittest.TestCase):
     def test_sample_T_fully_disconnected(self):
         """ Tests sampling T given R that implies full disconnectivity.
         """
-        model = fcdiff.models.IARModel()
+        model = fcdiff.UnsharedRegionModel()
         r = np.zeros((3, 1), dtype = 'bool')
         t = model.sample_T(r)
         t_exp = np.zeros((3, 1), dtype = 'bool')
@@ -77,7 +73,7 @@ class IARModelTestCase(unittest.TestCase):
     def test_sample_F_valid(self):
         """ Tests sampling F with valid arguments.
         """
-        model = fcdiff.models.IARModel()
+        model = fcdiff.UnsharedRegionModel()
         f = model.sample_F(100)
         gamma_est = np.mean(f, axis = 0)
         nptest.assert_allclose(gamma_est, model.gamma, atol = 0.05)
@@ -85,7 +81,7 @@ class IARModelTestCase(unittest.TestCase):
     def test_sample_F_tilde_typical_negative(self):
         """ Tests sampling F-tilde with a typical negative connection.
         """
-        model = fcdiff.models.IARModel()
+        model = fcdiff.UnsharedRegionModel()
         f = np.array([[1, 0, 0]], dtype = 'bool')
         t = np.tile(np.array([0], dtype = 'bool'), (1, 10000))
         f_tilde = model.sample_F_tilde(f, t)
@@ -97,7 +93,7 @@ class IARModelTestCase(unittest.TestCase):
     def test_sample_F_tilde_typical_neutral(self):
         """ Tests sampling F-tilde with a typical neutral connection.
         """
-        model = fcdiff.models.IARModel()
+        model = fcdiff.UnsharedRegionModel()
         f = np.array([[0, 1, 0]], dtype = 'bool')
         t = np.tile(np.array([0], dtype = 'bool'), (1, 10000))
         f_tilde = model.sample_F_tilde(f, t)
@@ -109,7 +105,7 @@ class IARModelTestCase(unittest.TestCase):
     def test_sample_F_tilde_typical_positive(self):
         """ Tests sampling F-tilde with a typical positive connection.
         """
-        model = fcdiff.models.IARModel()
+        model = fcdiff.UnsharedRegionModel()
         f = np.array([[0, 0, 1]], dtype = 'bool')
         t = np.tile(np.array([0], dtype = 'bool'), (1, 10000))
         f_tilde = model.sample_F_tilde(f, t)
@@ -121,7 +117,7 @@ class IARModelTestCase(unittest.TestCase):
     def test_sample_F_tilde_anomalous_negative(self):
         """ Tests sampling F-tilde with an anomalous negative connection.
         """
-        model = fcdiff.models.IARModel()
+        model = fcdiff.UnsharedRegionModel()
         f = np.array([[1, 0, 0]], dtype = 'bool')
         t = np.tile(np.array([1], dtype = 'bool'), (1, 10000))
         f_tilde = model.sample_F_tilde(f, t)
@@ -133,7 +129,7 @@ class IARModelTestCase(unittest.TestCase):
     def test_sample_F_tilde_anomalous_neutral(self):
         """ Tests sampling F-tilde with an anomalous neutral connection.
         """
-        model = fcdiff.models.IARModel()
+        model = fcdiff.UnsharedRegionModel()
         f = np.array([[0, 1, 0]], dtype = 'bool')
         t = np.tile(np.array([1], dtype = 'bool'), (1, 10000))
         f_tilde = model.sample_F_tilde(f, t)
@@ -145,7 +141,7 @@ class IARModelTestCase(unittest.TestCase):
     def test_sample_F_tilde_anomalous_positive(self):
         """ Tests sampling F-tilde with an anomalous positive connection.
         """
-        model = fcdiff.models.IARModel()
+        model = fcdiff.UnsharedRegionModel()
         f = np.array([[0, 0, 1]], dtype = 'bool')
         t = np.tile(np.array([1], dtype = 'bool'), (1, 10000))
         f_tilde = model.sample_F_tilde(f, t)
@@ -157,7 +153,7 @@ class IARModelTestCase(unittest.TestCase):
     def test_sample_B_range(self):
         """ Tests that sampling B creates values in [-1, 1].
         """
-        model = fcdiff.models.IARModel()
+        model = fcdiff.UnsharedRegionModel()
         f = np.array([
             [1, 0, 0],
             [0, 1, 0],
@@ -170,7 +166,7 @@ class IARModelTestCase(unittest.TestCase):
     def test_sample_B_negative(self):
         """ Tests sampling B from a negative connection.
         """
-        model = fcdiff.models.IARModel()
+        model = fcdiff.UnsharedRegionModel()
         f = np.array([[1, 0, 0]], dtype = 'bool')
         b = model.sample_B(f, 10000)
         mu_est = np.mean(b, axis = 1)
@@ -181,7 +177,7 @@ class IARModelTestCase(unittest.TestCase):
     def test_sample_B_neutral(self):
         """ Tests sampling B from a neutral connection.
         """
-        model = fcdiff.models.IARModel()
+        model = fcdiff.UnsharedRegionModel()
         f = np.array([[0, 1, 0]], dtype = 'bool')
         b = model.sample_B(f, 10000)
         mu_est = np.mean(b, axis = 1)
@@ -192,7 +188,7 @@ class IARModelTestCase(unittest.TestCase):
     def test_sample_B_positive(self):
         """ Tests sampling B from a positive connection.
         """
-        model = fcdiff.models.IARModel()
+        model = fcdiff.UnsharedRegionModel()
         f = np.array([[0, 0, 1]], dtype = 'bool')
         b = model.sample_B(f, 10000)
         mu_est = np.mean(b, axis = 1)
@@ -203,7 +199,7 @@ class IARModelTestCase(unittest.TestCase):
     def test_sample_B_tilde_range(self):
         """ Tests that sampling b_tilde creates values in [-1, 1].
         """
-        model = fcdiff.models.IARModel()
+        model = fcdiff.UnsharedRegionModel()
         f_tilde = np.tile(
                 np.array([
                     [[1, 0, 0]],
@@ -218,7 +214,7 @@ class IARModelTestCase(unittest.TestCase):
     def test_sample_B_tilde_negative(self):
         """ Tests sampling b_tilde from a negative connection.
         """
-        model = fcdiff.models.IARModel()
+        model = fcdiff.UnsharedRegionModel()
         f_tilde = np.tile(np.array([[[1, 0, 0]]], dtype = 'bool'), (1, 10000, 1))
         b_tilde = model.sample_B_tilde(f_tilde)
         mu_est = np.mean(b_tilde, axis = 1)
@@ -229,7 +225,7 @@ class IARModelTestCase(unittest.TestCase):
     def test_sample_B_tilde_neutral(self):
         """ Tests sampling b_tilde from a neutral connection.
         """
-        model = fcdiff.models.IARModel()
+        model = fcdiff.UnsharedRegionModel()
         f_tilde = np.tile(np.array([[[0, 1, 0]]], dtype = 'bool'), (1, 10000, 1))
         b_tilde = model.sample_B_tilde(f_tilde)
         mu_est = np.mean(b_tilde, axis = 1)
@@ -240,7 +236,7 @@ class IARModelTestCase(unittest.TestCase):
     def test_sample_B_tilde_positive(self):
         """ Tests sampling b_tilde from a positive connection.
         """
-        model = fcdiff.models.IARModel()
+        model = fcdiff.UnsharedRegionModel()
         f_tilde = np.tile(np.array([[[0, 0, 1]]], dtype = 'bool'), (1, 10000, 1))
         b_tilde = model.sample_B_tilde(f_tilde)
         mu_est = np.mean(b_tilde, axis = 1)

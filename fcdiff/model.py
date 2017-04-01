@@ -1,7 +1,12 @@
+"""
+Probabilistic models that generate correlations.
+"""
+
 import numpy as np
 import textwrap
+import fcdiff
 
-class IARModel(object):
+class UnsharedRegionModel(object):
     """
     The individual anomalous region (IAR) model.
 
@@ -26,7 +31,7 @@ class IARModel(object):
     def __init__(self):
         self.rng = np.random.RandomState(0)
         self.pi = 0.05
-        self.eta = 0.5
+        self.eta = 0.3
         self.gamma = np.array([0.1, 0.8, 0.1])
         self.epsilon = 0.03
         self.mu = np.array([-0.15, 0, 0.3])
@@ -34,7 +39,7 @@ class IARModel(object):
 
     def __str__(self):
         return textwrap.dedent('''\
-            fcdiff.models.IARModel
+            fcdiff.models.UnsharedRegionModel
                 rng = %s
                 pi = %g
                 eta = %g
@@ -122,7 +127,7 @@ class IARModel(object):
         C is the number of connections which is :math:`N (N - 1) / 2`.
         """
         (N, U) = r.shape
-        C = self._num_connections(N)
+        C = fcdiff.N_to_C(N)
         t = np.zeros((C, U), dtype = 'bool')
         c = 0
         for n in range(N):
@@ -151,7 +156,7 @@ class IARModel(object):
         f : :class:`numpy.ndarray`, (C, 3), bool
             Connection template of healthy subjects.
         """
-        C = self._num_connections(N)
+        C = fcdiff.N_to_C(N)
         return self.rng.multinomial(1, self.gamma, C) > 0
 
     def sample_F_tilde(self, f, t):
@@ -229,20 +234,4 @@ class IARModel(object):
                 s = self.sigma[f_tilde[c, u, :]]
                 b_tilde[c, u] = self.rng.normal(m, s)
         return b_tilde.clip(-1, 1)
-
-    def _num_connections(self, N):
-        """
-        Computes the number of connections for a network with N regions.
-
-        Arguments
-        ---------
-        N : 2 <= int
-            Number of regions.
-
-        Returns
-        -------
-        C : 1 <= int
-            Number of connections.
-        """
-        return N * (N - 1) / 2
 
