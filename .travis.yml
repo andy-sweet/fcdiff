@@ -7,7 +7,7 @@ before_install:
 install:
     - pip install -r requirements.txt
     - pip install coveralls
-    - pip install --only-binary :all: numpy scipy
+    - pip install --only-binary=numpy,scipy numpy scipy
 script: py.test --cov=fcdiff test_fcdiff
 after_success:
     - coveralls
