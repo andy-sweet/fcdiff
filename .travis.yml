@@ -2,10 +2,10 @@ language: python
 python:
     - 2.7
 install:
-    - pip install --upgrade pip
+    - pip install --upgrade pip setuptools wheel
     - pip install -r requirements.txt
     - pip install coveralls
-    - pip install --only-binary=:all: numpy scipy
+    - pip install --only-binary :all: numpy scipy
 script: py.test --cov=fcdiff test_fcdiff
 after_success:
     - coveralls
