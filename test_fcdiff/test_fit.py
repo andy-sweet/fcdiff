@@ -66,7 +66,6 @@ def rand_prob_vector(shape, seed = 0):
 
 # Class tests
 
-
 class UnsharedRegionFitTest(unittest.TestCase):
 
     def test_init_lps_shape(self):
@@ -84,8 +83,7 @@ class UnsharedRegionFitTest(unittest.TestCase):
         nptest.assert_equal(fit._lM.shape, (C, U, 3, 3))
 
     def test_is_converged_increase(self):
-        """
-        Tests convergence when there is an energy increase.
+        """ Tests convergence when there is an energy increase.
         """
         fit = fcdiff.fit.UnsharedRegionFit()
         fit.rel_tol = 0.5
@@ -93,8 +91,7 @@ class UnsharedRegionFitTest(unittest.TestCase):
         nptest.assert_equal(fit._is_converged(1), True)
 
     def test_is_converged_same(self):
-        """
-        Tests convergence when the energy does not change.
+        """ Tests convergence when the energy does not change.
         """
         fit = fcdiff.fit.UnsharedRegionFit()
         fit.rel_tol = 0.5
@@ -102,8 +99,7 @@ class UnsharedRegionFitTest(unittest.TestCase):
         nptest.assert_equal(fit._is_converged(1), True)
 
     def test_is_converged_decrease_small(self):
-        """
-        Tests convergence when energy decrease is small enough.
+        """ Tests convergence when energy decrease is small enough.
         """
         fit = fcdiff.fit.UnsharedRegionFit()
         fit.rel_tol = 0.5
@@ -111,8 +107,7 @@ class UnsharedRegionFitTest(unittest.TestCase):
         nptest.assert_equal(fit._is_converged(1), True)
 
     def test_is_converged_decrease_medium(self):
-        """
-        Tests lack of convergence when energy decrease is just big enough.
+        """ Tests lack of convergence when energy decrease is just big enough.
         """
         fit = fcdiff.fit.UnsharedRegionFit()
         fit.rel_tol = 0.5
@@ -120,8 +115,7 @@ class UnsharedRegionFitTest(unittest.TestCase):
         nptest.assert_equal(fit._is_converged(1), False)
 
     def test_is_converged_decrease_big(self):
-        """
-        Tests lack of convergence when energy decrease is big enough.
+        """ Tests lack of convergence when energy decrease is big enough.
         """
         fit = fcdiff.fit.UnsharedRegionFit()
         fit.rel_tol = 0.5
@@ -129,8 +123,7 @@ class UnsharedRegionFitTest(unittest.TestCase):
         nptest.assert_equal(fit._is_converged(1), False)
 
     def test_update_lps(self):
-        """
-        Tests updating log probabilities.
+        """ Tests updating log probabilities.
         """
         (N, C, H, U) = (4, 6, 7, 5)
         fit = fcdiff.fit.UnsharedRegionFit()
@@ -164,6 +157,305 @@ class UnsharedRegionFitTest(unittest.TestCase):
         nptest.assert_equal(fit._lp_B_g_F, lp_B_g_F)
         nptest.assert_equal(fit._p_Bt_g_Ft, p_Bt_g_Ft)
         nptest.assert_equal(fit._lM, lM)
+
+    def test_opt_jac_eta(self):
+        """ Tests computation of jacobian of minimization criterion wrt eta.
+        """
+        (N, C, H, U) = (4, 6, 7, 5)
+        fit = fcdiff.fit.UnsharedRegionFit()
+        fit.b = rand_prob_vector((C, H))
+        fit.bt = rand_prob_vector((C, U))
+        fit.model = create_ideal_model();
+        fit._init_lps(N, H, U)
+        fit._update_lps()
+
+        jac = fit._opt_jac()
+        jac_eta = jac[0]
+
+        exp_jac_eta = 0
+        M = np.exp(fit._lM)
+        q_R = np.exp(fit._lq_R)
+        q_F = np.exp(fit._lq_F)
+        for c in range(C):
+            (n, m) = fcdiff.util.c_to_nm(c)
+            for k in range(3):
+                ls = list(set(range(3)) - set([k]))
+                sum_u = 0
+                for u in range(U):
+                    sum_p_Bt_g_Ft_ls = np.sum(fit._p_Bt_g_Ft[c, u, ls])
+                    w = (2 * fit.model.epsilon) - 1
+                    dM_dh = w * fit._p_Bt_g_Ft[c, u, k] - 0.5 * w * sum_p_Bt_g_Ft_ls
+                    dlM_dh = dM_dh / M[c, u, k, 2]
+                    q_R_cu = q_R[n, u, 0] * q_R[m, u, 1]
+                    q_R_cu += q_R[n, u, 1] * q_R[m, u, 0]
+                    sum_u += q_R_cu * dlM_dh
+
+                exp_jac_eta -= q_F[c, 0, k] * sum_u
+
+        nptest.assert_allclose(jac_eta, exp_jac_eta)
+
+    def test_opt_jac_epsilon(self):
+        """ Tests computation of jacobian of minimization criterion wrt epsilon.
+        """
+        (N, C, H, U) = (4, 6, 7, 5)
+        fit = fcdiff.fit.UnsharedRegionFit()
+        fit.b = rand_prob_vector((C, H))
+        fit.bt = rand_prob_vector((C, U))
+        fit.model = create_ideal_model();
+        fit._init_lps(N, H, U)
+        fit._update_lps()
+
+        jac = fit._opt_jac()
+        jac_eps = jac[1]
+
+        exp_jac_eps = 0
+        M = np.exp(fit._lM)
+        q_R = np.exp(fit._lq_R)
+        q_F = np.exp(fit._lq_F)
+        for c in range(C):
+            (n, m) = fcdiff.util.c_to_nm(c)
+            for k in range(3):
+                ls = list(set(range(3)) - set([k]))
+                sum_u = 0
+                for u in range(U):
+                    sum_p_Bt_g_Ft_ls = np.sum(fit._p_Bt_g_Ft[c, u, ls])
+
+                    dM0_dh = 0.5 * sum_p_Bt_g_Ft_ls - fit._p_Bt_g_Ft[c, u, k]
+                    dlM0_dh = dM0_dh / M[c, u, k, 0]
+                    q_R_00 = q_R[n, u, 0] * q_R[m, u, 0]
+                    sum_u += q_R_00 * dlM0_dh
+
+                    dM1_dh = fit._p_Bt_g_Ft[c, u, k] - 0.5 * sum_p_Bt_g_Ft_ls
+                    dlM1_dh = dM1_dh / M[c, u, k, 1]
+                    q_R_11 = q_R[n, u, 1] * q_R[m, u, 1]
+                    sum_u += q_R_11 * dlM1_dh
+
+                    w = (2 * fit.model.eta - 1)
+                    dMneq_dh = w * fit._p_Bt_g_Ft[c, u, k] - 0.5 * w * sum_p_Bt_g_Ft_ls
+                    dlMneq_dh = dMneq_dh / M[c, u, k, 2]
+                    q_R_neq = q_R[n, u, 0] * q_R[m, u, 1]
+                    q_R_neq += q_R[n, u, 1] * q_R[m, u, 0]
+                    sum_u += q_R_neq * dlMneq_dh
+
+                exp_jac_eps -= q_F[c, 0, k] * sum_u
+
+        nptest.assert_allclose(jac_eps, exp_jac_eps)
+
+    def test_opt_jac_mu(self):
+        """ Tests computation of jacobian of minimization criterion wrt mu.
+        """
+        (N, C, H, U) = (4, 6, 7, 5)
+        fit = fcdiff.fit.UnsharedRegionFit()
+        fit.b = rand_prob_vector((C, H))
+        fit.bt = rand_prob_vector((C, U))
+        fit.model = create_ideal_model();
+        fit._init_lps(N, H, U)
+        fit._update_lps()
+
+        epsilon_t = fit.model.eta * fit.model.epsilon + (1 - fit.model.eta) * (1 - fit.model.epsilon)
+
+        jac = fit._opt_jac()
+        jac_mu = jac[2:5]
+
+        exp_jac_mu = np.zeros((3,))
+        M = np.exp(fit._lM)
+        q_R = np.exp(fit._lq_R)
+        q_F = np.exp(fit._lq_F)
+        for j in range(3):
+            for c in range(C):
+                (n, m) = fcdiff.util.c_to_nm(c)
+
+                sum_h = 0
+                for h in range(H):
+                    dlNj_dm = (fit.b[c, h] - fit.model.mu[j]) / (fit.model.sigma[j]**2)
+                    sum_h += dlNj_dm
+                exp_jac_mu[j] -= q_F[c, 0, j] * sum_h
+
+                for k in range(3):
+                    sum_u = 0
+                    for u in range(U):
+                        dlNj_dm = (fit.bt[c, u] - fit.model.mu[j]) / (fit.model.sigma[j]**2)
+                        dNj_dm = fit._p_Bt_g_Ft[c, u, j] * dlNj_dm
+
+                        if j == k:
+                            w0 = 1 - fit.model.epsilon
+                        else:
+                            w0 = fit.model.epsilon / 2
+                        dM0_dm = w0 * dNj_dm
+                        dlM0_dm = dM0_dm / M[c, u, k, 0]
+                        q_R_00 = q_R[n, u, 0] * q_R[m, u, 0]
+                        sum_u += q_R_00 * dlM0_dm
+
+                        if j == k:
+                            w1 = fit.model.epsilon
+                        else:
+                            w1 = (1 - fit.model.epsilon) / 2
+                        dM1_dm = w1 * dNj_dm
+                        dlM1_dm = dM1_dm / M[c, u, k, 1]
+                        q_R_11 = q_R[n, u, 1] * q_R[m, u, 1]
+                        sum_u += q_R_11 * dlM1_dm
+
+                        if j == k:
+                            wneq = epsilon_t
+                        else:
+                            wneq = (1 - epsilon_t) / 2
+                        dMneq_dm = wneq * dNj_dm
+                        dlMneq_dm = dMneq_dm / M[c, u, k, 2]
+                        q_R_neq = q_R[n, u, 0] * q_R[m, u, 1]
+                        q_R_neq += q_R[n, u, 1] * q_R[m, u, 0]
+                        sum_u += q_R_neq * dlMneq_dm
+                    exp_jac_mu[j] -= q_F[c, 0, k] * sum_u
+
+        nptest.assert_allclose(jac_mu, exp_jac_mu)
+
+    def test_opt_jac_sigma(self):
+        """ Tests computation of jacobian of minimization criterion wrt sigma.
+        """
+        (N, C, H, U) = (4, 6, 7, 5)
+        fit = fcdiff.fit.UnsharedRegionFit()
+        fit.b = rand_prob_vector((C, H))
+        fit.bt = rand_prob_vector((C, U))
+        fit.model = create_ideal_model();
+        fit._init_lps(N, H, U)
+        fit._update_lps()
+
+        epsilon_t = fit.model.eta * fit.model.epsilon + (1 - fit.model.eta) * (1 - fit.model.epsilon)
+
+        jac = fit._opt_jac()
+        jac_sigma = jac[5:8]
+
+        exp_jac_sigma = np.zeros((3,))
+        M = np.exp(fit._lM)
+        q_R = np.exp(fit._lq_R)
+        q_F = np.exp(fit._lq_F)
+        sigma2 = fit.model.sigma ** 2
+        for j in range(3):
+            for c in range(C):
+                (n, m) = fcdiff.util.c_to_nm(c)
+
+                sum_h = 0
+                for h in range(H):
+                    diff = fit.b[c, h] - fit.model.mu[j]
+                    dlNj_ds = (diff ** 2 - sigma2[j]) / (2 * sigma2[j])
+                    sum_h += dlNj_ds
+                exp_jac_sigma[j] -= q_F[c, 0, j] * sum_h
+
+                for k in range(3):
+                    sum_u = 0
+                    for u in range(U):
+                        diff = fit.bt[c, u] - fit.model.mu[j]
+                        dlNj_ds = (diff**2 - sigma2[j]) / (2 * sigma2[j])
+                        dNj_ds = fit._p_Bt_g_Ft[c, u, j] * dlNj_ds
+
+                        if j == k:
+                            w0 = 1 - fit.model.epsilon
+                        else:
+                            w0 = fit.model.epsilon / 2
+                        dM0_ds = w0 * dNj_ds
+                        dlM0_ds = dM0_ds / M[c, u, k, 0]
+                        q_R_00 = q_R[n, u, 0] * q_R[m, u, 0]
+                        sum_u += q_R_00 * dlM0_ds
+
+                        if j == k:
+                            w1 = fit.model.epsilon
+                        else:
+                            w1 = (1 - fit.model.epsilon) / 2
+                        dM1_ds = w1 * dNj_ds
+                        dlM1_ds = dM1_ds / M[c, u, k, 1]
+                        q_R_11 = q_R[n, u, 1] * q_R[m, u, 1]
+                        sum_u += q_R_11 * dlM1_ds
+
+                        if j == k:
+                            wneq = epsilon_t
+                        else:
+                            wneq = (1 - epsilon_t) / 2
+                        dMneq_ds = wneq * dNj_ds
+                        dlMneq_ds = dMneq_ds / M[c, u, k, 2]
+                        q_R_neq = q_R[n, u, 0] * q_R[m, u, 1]
+                        q_R_neq += q_R[n, u, 1] * q_R[m, u, 0]
+                        sum_u += q_R_neq * dlMneq_ds
+                    exp_jac_sigma[j] -= q_F[c, 0, k] * sum_u
+
+        nptest.assert_allclose(jac_sigma, exp_jac_sigma)
+
+    def test_opt_fun():
+        """ Tests evaluation the optmization function and jacobian.
+        """
+
+        # create an ideal model and sample from it
+        (N, C, H, U) = (4, 6, 7, 5)
+        model = create_ideal_model()
+        (r, t, f, ft, b, bt) = model.sample(N, H, U)
+
+        # give almost perfect estimates of log posteriors
+        r = r.clip(1e-5, 1 - 1e-5)
+        q_R = np.zeros((N, U, 2))
+        q_R[:, :, 0] = 1 - r
+        q_R[:, :, 1] = r
+        lq_R = np.log(q_R)
+
+        f = f.clip(1e-5, 1 - 1e-5)
+        q_F = f.reshape((C, 1, 3))
+        lq_F = np.log(q_F)
+
+        theta_sub = fcdiff.fit._pack_theta_sub(model)
+        lp_B_g_F = np.zeros((C, H, 3))
+        p_Bt_g_Ft = np.zeros((C, U, 3))
+        lM = np.zeros((C, U, 3, 3))
+
+        # evaluate the ideal model's energy
+        (ideal_energy, ideal_jac) = fcdiff.fit._opt_fun(theta_sub, q_F, q_R,
+                lq_F, lq_R, lp_B_g_F, p_Bt_g_Ft, lM, model, b, bt)
+
+        # perturb the parameter values a little and re-evaluate the energy
+        model.eta += 0.1
+        model.epsilon += 0.01
+        model.mu += [-0.1, 0, 0.1]
+        model.sigma += [0.01, 0, 0.01]
+
+        (pert_energy, pert_jac) = fcdiff.fit._opt_fun(theta_sub, q_F, q_R,
+                lq_F, lq_R, lp_B_g_F, p_Bt_g_Ft, lM, model, b, bt)
+
+        # check that the energy went up
+        nptest.assert_array_less(ideal_energy, pert_energy)
+
+#def test_update_theta_sub():
+#    """ Tests updating the vector of parameters excluding pi and gamma.
+#    """
+#
+#    # create an ideal model and sample from it
+#    (N, H, U) = (60, 50, 40)
+#    C = fcdiff.N_to_C(N)
+#    model = create_ideal_model()
+#    (r, t, f, ft, b, bt) = model.sample(N, H, U)
+#
+#    # give almost perfect estimates of log posteriors
+#    r = r.clip(1e-5, 1 - 1e-5)
+#    q_R = np.zeros((N, U, 2))
+#    q_R[:, :, 0] = 1 - r
+#    q_R[:, :, 1] = r
+#    f = f.clip(1e-5, 1 - 1e-5)
+#    q_F = np.reshape(f, (C, 1, 3))
+#
+#    # perturb the parameter values a little
+#    model.eta += 0.1
+#    #model.epsilon += 0.01
+#    #model.mu += [-0.05, 0, 0.05]
+#    #model.sigma += [0.01, 0.01, 0.01]
+#
+#    # initialize (log) probabilites
+#    lp_B_g_F = np.zeros((C, H, 3))
+#    p_Bt_g_Ft = np.zeros((C, U, 3))
+#    lM = np.zeros((C, U, 3, 3))
+#
+#    fcdiff.fit._update_theta_sub(model, b, bt, q_R, q_F, lp_B_g_F, p_Bt_g_Ft, lM)
+#
+#    exp_model = create_ideal_model()
+#
+#    nptest.assert_allclose(model.eta, exp_model.eta)
+#    nptest.assert_allclose(model.epsilon, exp_model.epsilon)
+#    nptest.assert_allclose(model.mu, exp_model.mu)
+#    nptest.assert_allclose(model.sigma, exp_model.sigma)
 
 
 # Function tests
@@ -1086,308 +1378,4 @@ def test_eval_dE_de():
 
     nptest.assert_allclose(act_dE_de, exp_dE_de)
 
-#def test_opt_jac_eta():
-#    """
-#    Tests computation of jacobian of minimization criterion wrt eta.
-#    """
-#    (N, C, H, U) = (4, 6, 7, 5)
-#    b = rand_prob_vector((C, H))
-#    bt = rand_prob_vector((C, U))
-#    q_R = rand_prob_vector((N, U, 2))
-#    q_F = rand_prob_vector((C, 1, 3))
-#    p_Bt_g_Ft = rand_prob_vector((C, U, 3))
-#    M = rand_prob_vector((C, U, 3, 3))
-#    lM = np.log(M)
-#    model = fcdiff.UnsharedRegionModel()
-#    model.epsilon = 0.33
-#
-#    jac = fcdiff.fit._opt_jac(b, bt, model, q_R, q_F, p_Bt_g_Ft, lM)
-#    jac_eta = jac[0]
-#
-#    exp_jac_eta = 0
-#    for c in range(C):
-#        (n, m) = fcdiff.util.c_to_nm(c)
-#        for k in range(3):
-#            ls = list(set(range(3)) - set([k]))
-#            sum_u = 0
-#            for u in range(U):
-#                sum_p_Bt_g_Ft_ls = np.sum(p_Bt_g_Ft[c, u, ls])
-#                w = (2 * model.epsilon) - 1
-#                dM_dh = w * p_Bt_g_Ft[c, u, k] - 0.5 * w * sum_p_Bt_g_Ft_ls
-#                dlM_dh = dM_dh / M[c, u, k, 2]
-#                q_R_cu = q_R[n, u, 0] * q_R[m, u, 1]
-#                q_R_cu += q_R[n, u, 1] * q_R[m, u, 0]
-#                sum_u += q_R_cu * dlM_dh
-#
-#            exp_jac_eta -= q_F[c, 0, k] * sum_u
-#
-#    nptest.assert_allclose(jac_eta, exp_jac_eta)
-
-#def test_opt_jac_epsilon():
-#    """ Tests computation of jacobian of minimization criterion wrt epsilon.
-#    """
-#    (N, C, H, U) = (4, 6, 7, 5)
-#    b = rand_prob_vector((C, H))
-#    bt = rand_prob_vector((C, U))
-#    q_R = rand_prob_vector((N, U, 2))
-#    q_F = rand_prob_vector((C, 1, 3))
-#    p_Bt_g_Ft = rand_prob_vector((C, U, 3))
-#    M = rand_prob_vector((C, U, 3, 3))
-#    lM = np.log(M)
-#    model = fcdiff.UnsharedRegionModel()
-#    model.eta = 0.47
-#
-#    jac = fcdiff.fit._opt_jac(b, bt, model, q_R, q_F, p_Bt_g_Ft, lM)
-#    jac_eps = jac[1]
-#
-#    exp_jac_eps = 0
-#    for c in range(C):
-#        (n, m) = fcdiff.util.c_to_nm(c)
-#        for k in range(3):
-#            ls = list(set(range(3)) - set([k]))
-#            sum_u = 0
-#            for u in range(U):
-#                sum_p_Bt_g_Ft_ls = np.sum(p_Bt_g_Ft[c, u, ls])
-#
-#                dM0_dh = 0.5 * sum_p_Bt_g_Ft_ls - p_Bt_g_Ft[c, u, k]
-#                dlM0_dh = dM0_dh / M[c, u, k, 0]
-#                q_R_00 = q_R[n, u, 0] * q_R[m, u, 0]
-#                sum_u += q_R_00 * dlM0_dh
-#
-#                dM1_dh = p_Bt_g_Ft[c, u, k] - 0.5 * sum_p_Bt_g_Ft_ls
-#                dlM1_dh = dM1_dh / M[c, u, k, 1]
-#                q_R_11 = q_R[n, u, 1] * q_R[m, u, 1]
-#                sum_u += q_R_11 * dlM1_dh
-#
-#                w = (2 * model.eta - 1)
-#                dMneq_dh = w * p_Bt_g_Ft[c, u, k] - 0.5 * w * sum_p_Bt_g_Ft_ls
-#                dlMneq_dh = dMneq_dh / M[c, u, k, 2]
-#                q_R_neq = q_R[n, u, 0] * q_R[m, u, 1]
-#                q_R_neq += q_R[n, u, 1] * q_R[m, u, 0]
-#                sum_u += q_R_neq * dlMneq_dh
-#
-#            exp_jac_eps -= q_F[c, 0, k] * sum_u
-#
-#    nptest.assert_allclose(jac_eps, exp_jac_eps)
-#
-#def test_opt_jac_mu():
-#    """ Tests computation of jacobian of minimization criterion wrt mu.
-#    """
-#    (N, C, H, U) = (4, 6, 7, 5)
-#    b = rand_prob_vector((C, H))
-#    bt = rand_prob_vector((C, U))
-#    q_R = rand_prob_vector((N, U, 2))
-#    q_F = rand_prob_vector((C, 1, 3))
-#    p_Bt_g_Ft = rand_prob_vector((C, U, 3))
-#    M = rand_prob_vector((C, U, 3, 3))
-#    lM = np.log(M)
-#    model = fcdiff.UnsharedRegionModel()
-#    model.eta = 0.398
-#    model.epsilon = 0.037
-#    model.mu = np.array([-0.33, 0, 0.411])
-#    model.sigma = np.array([0.111, 0.099, 0.177])
-#    epsilon_t = model.eta * model.epsilon + (1 - model.eta) * (1 - model.epsilon)
-#
-#    jac = fcdiff.fit._opt_jac(b, bt, model, q_R, q_F, p_Bt_g_Ft, lM)
-#    jac_mu = jac[2:5]
-#
-#    exp_jac_mu = np.zeros((3,))
-#    for j in range(3):
-#        for c in range(C):
-#            (n, m) = fcdiff.util.c_to_nm(c)
-#
-#            sum_h = 0
-#            for h in range(H):
-#                dlNj_dm = (b[c, h] - model.mu[j]) / (model.sigma[j]**2)
-#                sum_h += dlNj_dm
-#            exp_jac_mu[j] -= q_F[c, 0, j] * sum_h
-#
-#            for k in range(3):
-#                sum_u = 0
-#                for u in range(U):
-#                    dlNj_dm = (bt[c, u] - model.mu[j]) / (model.sigma[j]**2)
-#                    dNj_dm = p_Bt_g_Ft[c, u, j] * dlNj_dm
-#
-#                    if j == k:
-#                        w0 = 1 - model.epsilon
-#                    else:
-#                        w0 = model.epsilon / 2
-#                    dM0_dm = w0 * dNj_dm
-#                    dlM0_dm = dM0_dm / M[c, u, k, 0]
-#                    q_R_00 = q_R[n, u, 0] * q_R[m, u, 0]
-#                    sum_u += q_R_00 * dlM0_dm
-#
-#                    if j == k:
-#                        w1 = model.epsilon
-#                    else:
-#                        w1 = (1 - model.epsilon) / 2
-#                    dM1_dm = w1 * dNj_dm
-#                    dlM1_dm = dM1_dm / M[c, u, k, 1]
-#                    q_R_11 = q_R[n, u, 1] * q_R[m, u, 1]
-#                    sum_u += q_R_11 * dlM1_dm
-#
-#                    if j == k:
-#                        wneq = epsilon_t
-#                    else:
-#                        wneq = (1 - epsilon_t) / 2
-#                    dMneq_dm = wneq * dNj_dm
-#                    dlMneq_dm = dMneq_dm / M[c, u, k, 2]
-#                    q_R_neq = q_R[n, u, 0] * q_R[m, u, 1]
-#                    q_R_neq += q_R[n, u, 1] * q_R[m, u, 0]
-#                    sum_u += q_R_neq * dlMneq_dm
-#                exp_jac_mu[j] -= q_F[c, 0, k] * sum_u
-#
-#    nptest.assert_allclose(jac_mu, exp_jac_mu)
-#
-#def test_opt_jac_sigma():
-#    """ Tests computation of jacobian of minimization criterion wrt sigma.
-#    """
-#    (N, C, H, U) = (4, 6, 7, 5)
-#    b = rand_prob_vector((C, H))
-#    bt = rand_prob_vector((C, U))
-#    q_R = rand_prob_vector((N, U, 2))
-#    q_F = rand_prob_vector((C, 1, 3))
-#    p_Bt_g_Ft = rand_prob_vector((C, U, 3))
-#    M = rand_prob_vector((C, U, 3, 3))
-#    lM = np.log(M)
-#    model = fcdiff.UnsharedRegionModel()
-#    model.eta = 0.398
-#    model.epsilon = 0.037
-#    model.mu = np.array([-0.33, 0, 0.411])
-#    model.sigma = np.array([0.111, 0.099, 0.177])
-#    epsilon_t = model.eta * model.epsilon + (1 - model.eta) * (1 - model.epsilon)
-#    sigma2 = model.sigma**2
-#
-#    jac = fcdiff.fit._opt_jac(b, bt, model, q_R, q_F, p_Bt_g_Ft, lM)
-#    jac_sigma = jac[5:8]
-#
-#    exp_jac_sigma = np.zeros((3,))
-#    for j in range(3):
-#        for c in range(C):
-#            (n, m) = fcdiff.util.c_to_nm(c)
-#
-#            sum_h = 0
-#            for h in range(H):
-#                diff = b[c, h] - model.mu[j]
-#                dlNj_ds = (diff**2 - sigma2[j]) / (2 * sigma2[j])
-#                sum_h += dlNj_ds
-#            exp_jac_sigma[j] -= q_F[c, 0, j] * sum_h
-#
-#            for k in range(3):
-#                sum_u = 0
-#                for u in range(U):
-#                    diff = bt[c, u] - model.mu[j]
-#                    dlNj_ds = (diff**2 - sigma2[j]) / (2 * sigma2[j])
-#                    dNj_ds = p_Bt_g_Ft[c, u, j] * dlNj_ds
-#
-#                    if j == k:
-#                        w0 = 1 - model.epsilon
-#                    else:
-#                        w0 = model.epsilon / 2
-#                    dM0_ds = w0 * dNj_ds
-#                    dlM0_ds = dM0_ds / M[c, u, k, 0]
-#                    q_R_00 = q_R[n, u, 0] * q_R[m, u, 0]
-#                    sum_u += q_R_00 * dlM0_ds
-#
-#                    if j == k:
-#                        w1 = model.epsilon
-#                    else:
-#                        w1 = (1 - model.epsilon) / 2
-#                    dM1_ds = w1 * dNj_ds
-#                    dlM1_ds = dM1_ds / M[c, u, k, 1]
-#                    q_R_11 = q_R[n, u, 1] * q_R[m, u, 1]
-#                    sum_u += q_R_11 * dlM1_ds
-#
-#                    if j == k:
-#                        wneq = epsilon_t
-#                    else:
-#                        wneq = (1 - epsilon_t) / 2
-#                    dMneq_ds = wneq * dNj_ds
-#                    dlMneq_ds = dMneq_ds / M[c, u, k, 2]
-#                    q_R_neq = q_R[n, u, 0] * q_R[m, u, 1]
-#                    q_R_neq += q_R[n, u, 1] * q_R[m, u, 0]
-#                    sum_u += q_R_neq * dlMneq_ds
-#                exp_jac_sigma[j] -= q_F[c, 0, k] * sum_u
-#
-#    nptest.assert_allclose(jac_sigma, exp_jac_sigma)
-#
-#def test_opt_fun():
-#    """ Tests evaluation the optmization function and jacobian.
-#    """
-#
-#    # create an ideal model and sample from it
-#    (N, C, H, U) = (4, 6, 7, 5)
-#    model = create_ideal_model()
-#    (r, t, f, ft, b, bt) = model.sample(N, H, U)
-#
-#    # give almost perfect estimates of log posteriors
-#    r = r.clip(1e-5, 1 - 1e-5)
-#    q_R = np.zeros((N, U, 2))
-#    q_R[:, :, 0] = 1 - r
-#    q_R[:, :, 1] = r
-#    lq_R = np.log(q_R)
-#
-#    f = f.clip(1e-5, 1 - 1e-5)
-#    q_F = f.reshape((C, 1, 3))
-#    lq_F = np.log(q_F)
-#
-#    theta_sub = fcdiff.fit._pack_theta_sub(model)
-#    lp_B_g_F = np.zeros((C, H, 3))
-#    p_Bt_g_Ft = np.zeros((C, U, 3))
-#    lM = np.zeros((C, U, 3, 3))
-#
-#    # evaluate the ideal model's energy
-#    (ideal_energy, ideal_jac) = fcdiff.fit._opt_fun(theta_sub, q_F, q_R,
-#            lq_F, lq_R, lp_B_g_F, p_Bt_g_Ft, lM, model, b, bt)
-#
-#    # perturb the parameter values a little and re-evaluate the energy
-#    model.eta += 0.1
-#    model.epsilon += 0.01
-#    model.mu += [-0.1, 0, 0.1]
-#    model.sigma += [0.01, 0, 0.01]
-#
-#    (pert_energy, pert_jac) = fcdiff.fit._opt_fun(theta_sub, q_F, q_R,
-#            lq_F, lq_R, lp_B_g_F, p_Bt_g_Ft, lM, model, b, bt)
-#
-#    # check that the energy went up
-#    nptest.assert_array_less(ideal_energy, pert_energy)
-#
-#def test_update_theta_sub():
-#    """ Tests updating the vector of parameters excluding pi and gamma.
-#    """
-#
-#    # create an ideal model and sample from it
-#    (N, H, U) = (60, 50, 40)
-#    C = fcdiff.N_to_C(N)
-#    model = create_ideal_model()
-#    (r, t, f, ft, b, bt) = model.sample(N, H, U)
-#
-#    # give almost perfect estimates of log posteriors
-#    r = r.clip(1e-5, 1 - 1e-5)
-#    q_R = np.zeros((N, U, 2))
-#    q_R[:, :, 0] = 1 - r
-#    q_R[:, :, 1] = r
-#    f = f.clip(1e-5, 1 - 1e-5)
-#    q_F = np.reshape(f, (C, 1, 3))
-#
-#    # perturb the parameter values a little
-#    model.eta += 0.1
-#    #model.epsilon += 0.01
-#    #model.mu += [-0.05, 0, 0.05]
-#    #model.sigma += [0.01, 0.01, 0.01]
-#
-#    # initialize (log) probabilites
-#    lp_B_g_F = np.zeros((C, H, 3))
-#    p_Bt_g_Ft = np.zeros((C, U, 3))
-#    lM = np.zeros((C, U, 3, 3))
-#
-#    fcdiff.fit._update_theta_sub(model, b, bt, q_R, q_F, lp_B_g_F, p_Bt_g_Ft, lM)
-#
-#    exp_model = create_ideal_model()
-#
-#    nptest.assert_allclose(model.eta, exp_model.eta)
-#    nptest.assert_allclose(model.epsilon, exp_model.epsilon)
-#    nptest.assert_allclose(model.mu, exp_model.mu)
-#    nptest.assert_allclose(model.sigma, exp_model.sigma)
-#
 

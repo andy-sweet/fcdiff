@@ -290,8 +290,12 @@ class UnsharedRegionFit(object):
         """
         Computes the jacobian of the energy.
         """
-        (N, U) = self.q_R.shape[0:2]
-        C = self.q_F.shape[0]
+        (N, U) = self._lq_R.shape[0:2]
+        C = self._lq_F.shape[0]
+        q_R = np.exp(self._lq_R)
+        q_F = np.exp(self._lq_F)
+        M = np.exp(self._lM)
+
         dE_dh = 0
         dE_de = 0
         dE_dm = np.zeros((3,))
@@ -300,71 +304,74 @@ class UnsharedRegionFit(object):
         epsilon = self.model.epsilon
         mu = self.model.mu
         sigma = self.model.sigma
+
+        dlM_dh = np.zeros((C, U, 3))
+        dlM_de = np.zeros((C, U, 3, 3))
+        dlM_dm = np.zeros((C, U, 3, 3, 3))
+        dlM_ds = np.zeros((C, U, 3, 3, 3))
+        for k in range(3):
+            dlM_dh[:, :, k] = _eval_dlM_dh(self._p_Bt_g_Ft, M[:, :, k, 2], epsilon, k)
+            for l in range(3):
+                dlM_de[:, :, k, l] = _eval_dlM_de(self._p_Bt_g_Ft, M[:, :, k, l], eta, k, l)
+                for j in range(3):
+                    dlM_dm[:, :, k, l, j] = self._eval_dlM_dm(k, l, j)
+                    dlM_ds[:, :, k, l, j] = self._eval_dlM_ds(k, l, j)
+
         for c in range(C):
             (n, m) = util.c_to_nm(c)
             q_R_w = _eval_q_R_w(q_R, n, m)
             for j in range(3):
-                dlNj_dm = self._d_log_N_d_mu(self.b[c, :], mu[j], sigma[j])
-                dE_dm[j] -= self.q_F[c, 0, j] * np.sum(dlNj_dm)
-                dlNj_ds = self._d_log_N_d_sigma(self.b[c, :], mu[j], sigma[j])
-                dE_ds[j] -= self.q_F[c, 0, j] * np.sum(dlNj_ds)
+                dlNj_dm = _eval_dlN_dm(self.b[c, :], mu[j], sigma[j])
+                dE_dm[j] -= q_F[c, 0, j] * np.sum(dlNj_dm)
+                dlNj_ds = _eval_dlN_ds(self.b[c, :], mu[j], sigma[j])
+                dE_ds[j] -= q_F[c, 0, j] * np.sum(dlNj_ds)
 
             for k in range(3):
-                dlM_dh = self._dlM_dh(c, k)
-                dlM_de = np.zeros((U, 3))
-                dlM_dm = np.zeros((U, 3, 3))
-                dlM_ds = np.zeros((U, 3, 3))
+                q_F_ck = q_F[c, 0, k]
+                dE_dh -= q_F_ck * np.sum(q_R_w[:, 2] * dlM_dh[c, :, k])
                 for l in range(3):
-                    M_ckl = M_ck[:, l]
-                    dlM_de[:, l] = self._dlM_de(c, k, l)
-                    for j in range(3):
-                        dlM_dm[:, j, l] = self._dlM_dm(c, k, l, j)
-                        dlM_ds[:, j, l] = self._dlM_ds(c, k, l, j)
-
-                q_F_ck = self.q_F[c, 0, k]
-                dE_dh -= q_F_ck * np.sum(q_R_w[:, 2] * dlM_dh)
-                dE_de -= q_F_ck * np.sum(q_R_w * dlM_de)
+                    dE_de -= q_F_ck * np.sum(q_R_w[:, l] * dlM_de[c, :, k, l])
                 for j in range(3):
-                    dE_dm[j] -= q_F_ck * np.sum(q_R_w * dlM_dm[:, j, :])
-                    dE_ds[j] -= q_F_ck * np.sum(q_R_w * dlM_ds[:, j, :])
+                    for l in range(3):
+                        dE_dm[j] -= q_F_ck * np.sum(q_R_w[:, l] * dlM_dm[c, :, k, l, j])
+                        dE_ds[j] -= q_F_ck * np.sum(q_R_w[:, l] * dlM_ds[c, :, k, l, j])
 
         jac_list = (
             [dE_dh],
             [dE_de],
-            #dE_dm,
-            #dE_ds,
+            dE_dm,
+            dE_ds,
         )
         return np.concatenate(jac_list)
 
-    def _eval_dE_dm(self, q_R, q_F):
-        """
-        Evaluates :math:`\frac{\partial \mathcal{E}}{\partial \mu}`.
-        """
-        (N, U) = q_R.shape[0:2]
-        C = q_F.shape[0]
-        dE_dm = np.zeros((3,))
-        eta = self.model.eta
-        epsilon = self.model.epsilon
-        mu = self.model.mu
-        sigma = self.model.sigma
-        for c in range(C):
-            (n, m) = util.c_to_nm(c)
-            q_R_w = _eval_q_R_w(q_R, n, m)
-            for j in range(3):
-                dlN_dm = _eval_dlN_dm(self.b[c, :], mu[j], sigma[j])
-                dE_dm[j] -= self.q_F[c, 0, j] * np.sum(dlN_dm)
-            for k in range(3):
-                dlM_dm = np.zeros((U, 3, 3))
-                for l in range(3):
-                    M_ckl = M_ck[:, l]
-                    for j in range(3):
-                        dlM_dm[:, j, l] = _eval_dlM_dm(c, k, l, j)
-                q_F_ck = self.q_F[c, 0, k]
-                for j in range(3):
-                    dE_dm[j] -= q_F_ck * np.sum(q_R_w * dlM_dm[:, j, :])
+    #def _eval_dE_dm(self, q_R, q_F):
+    #    """
+    #    Evaluates :math:`\frac{\partial \mathcal{E}}{\partial \mu}`.
+    #    """
+    #    (N, U) = q_R.shape[0:2]
+    #    C = q_F.shape[0]
+    #    dE_dm = np.zeros((3,))
+    #    eta = self.model.eta
+    #    epsilon = self.model.epsilon
+    #    mu = self.model.mu
+    #    sigma = self.model.sigma
+    #    for c in range(C):
+    #        (n, m) = util.c_to_nm(c)
+    #        q_R_w = _eval_q_R_w(q_R, n, m)
+    #        for j in range(3):
+    #            dlN_dm = _eval_dlN_dm(self.b[c, :], mu[j], sigma[j])
+    #            dE_dm[j] -= self.q_F[c, 0, j] * np.sum(dlN_dm)
+    #        for k in range(3):
+    #            dlM_dm = np.zeros((U, 3, 3))
+    #            for l in range(3):
+    #                M_ckl = M_ck[:, l]
+    #                for j in range(3):
+    #                    dlM_dm[:, j, l] = _eval_dlM_dm(c, k, l, j)
+    #            q_F_ck = self.q_F[c, 0, k]
+    #            for j in range(3):
+    #                dE_dm[j] -= q_F_ck * np.sum(q_R_w * dlM_dm[:, j, :])
 
-
-    def _eval_dlM_dm(self, c, k, l, j):
+    def _eval_dlM_dm(self, k, l, j):
         """
         Computes the derivative of log M w.r.t. mu.
         """
@@ -375,8 +382,22 @@ class UnsharedRegionFit(object):
         e = _eval_M_eps(eta, epsilon, l)
         if j != k:
             e = (1 - e) / 2
-        M = self._lM[c, :, k, l]
-        return e * _dN_dm(self.bt[c, :], mu[j], sigma[j]) / M
+        M = np.exp(self._lM[:, :, k, l])
+        return e * _eval_dN_dm(self._p_Bt_g_Ft[:, :, j], self.bt[:, :], mu[j], sigma[j]) / M
+
+    def _eval_dlM_ds(self, k, l, j):
+        """
+        Computes the derivative of log M w.r.t. sigma.
+        """
+        eta = self.model.eta
+        epsilon = self.model.epsilon
+        mu = self.model.mu
+        sigma = self.model.sigma
+        e = _eval_M_eps(eta, epsilon, l)
+        if j != k:
+            e = (1 - e) / 2
+        M = np.exp(self._lM[:, :, k, l])
+        return e * _eval_dN_ds(self._p_Bt_g_Ft[:, :, j], self.bt[:, :], mu[j], sigma[j]) / M
 
 
 def _eval_q_R_w(q_R, n, m):
